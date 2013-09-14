@@ -12,6 +12,8 @@
 #include "file.hh"
 #include "filetype.hh"
 #include "htmlescape.hh"
+#include <QRegExp>
+#include <QDebug>
 
 namespace Xdxf2Html {
 
@@ -109,15 +111,20 @@ string convert( string const & in, DICT_TYPE type, map < string, string > const 
 
   string in_data;
   if( type == XDXF )
-      in_data = "<div class=\"xdxf\">";
+  {
+      in_data = "<div class=\"xdxf\"";
+      if( dictPtr->isToLanguageRTL() )
+        in_data += " dir=\"rtl\"";
+      in_data += ">";
+  }
   else
       in_data = "<div class=\"sdct_x\">";
   in_data += inConverted + "</div>";
 
   if( !dd.setContent( QByteArray( in_data.c_str() ), false, &errorStr, &errorLine, &errorColumn  ) )
   {
-    FDPRINTF( stderr, "Xdxf2html error, xml parse failed: %s at %d,%d\n", errorStr.toLocal8Bit().constData(),  errorLine,  errorColumn );
-    FDPRINTF( stderr, "The input was: %s\n", in.c_str() );
+    qWarning( "Xdxf2html error, xml parse failed: %s at %d,%d\n", errorStr.toLocal8Bit().constData(),  errorLine,  errorColumn );
+    qWarning( "The input was: %s\n", in.c_str() );
 
     return in;
   }
@@ -160,6 +167,8 @@ string convert( string const & in, DICT_TYPE type, map < string, string > const 
     {
         el.setTagName( "div" );
         el.setAttribute( "class", "xdxf_headwords" );
+        if( dictPtr->isFromLanguageRTL() != dictPtr->isToLanguageRTL() )
+          el.setAttribute( "dir", dictPtr->isFromLanguageRTL() ? "rtl" : "ltr" );
     }
   }
   
@@ -499,7 +508,7 @@ string convert( string const & in, DICT_TYPE type, map < string, string > const 
           QDomNode parent = el.parentNode();
           if( !parent.isNull() )
           {
-            el_script.setAttribute( "language", "JavaScript" );
+            el_script.setAttribute( "type", "text/javascript" );
             parent.replaceChild( el_script, el );
 
             QDomText el_txt = dd.createTextNode( makeAudioLinkScript( string( "\"" ) + url.toEncoded().data() + "\"",
@@ -535,7 +544,7 @@ string convert( string const & in, DICT_TYPE type, map < string, string > const 
 
 //  DPRINTF( "Result>>>>>>>>>>: %s\n\n\n", dd.toByteArray().data() );
 
-  return dd.toString().remove('\n').toUtf8().data();
+  return dd.toString().remove('\n').remove( QRegExp( "<(b|i)/>" ) ).toUtf8().data();
 }
 
 }

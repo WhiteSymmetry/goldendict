@@ -45,6 +45,9 @@
 #include <QByteArray>
 #include <QBuffer>
 
+// For SVG handling
+#include <QtSvg/QSvgRenderer>
+
 namespace Dsl {
 
 using namespace Details;
@@ -70,7 +73,7 @@ DEF_EX_STR( exCantReadFile, "Can't read file", Dictionary::Ex )
 enum
 {
   Signature = 0x584c5344, // DSLX on little-endian, XLSD on big-endian
-  CurrentFormatVersion = 17 + BtreeIndexing::FormatVersion + Folding::Version,
+  CurrentFormatVersion = 19 + BtreeIndexing::FormatVersion + Folding::Version,
   CurrentZipSupportVersion = 2
 };
 
@@ -343,7 +346,7 @@ void DslDictionary::doDeferredInit()
 
       chunks = new ChunkedStorage::Reader( idx, idxHeader.chunksOffset );
 
-      // Open the .dict file
+      // Open the .dsl file
 
       dz = dict_data_open( getDictionaryFilenames()[ 0 ].c_str(), 0 );
 
@@ -503,20 +506,29 @@ void DslDictionary::loadArticle( uint32_t address,
     }
 
     if ( !articleBody )
-      throw exCantReadFile( getDictionaryFilenames()[ 0 ] );
-
-    try
     {
-      articleData =
-        DslIconv::toWstring(
-          DslIconv::getEncodingNameFor( DslEncoding( idxHeader.dslEncoding ) ),
-          articleBody, articleSize );
-      free( articleBody );
+//      throw exCantReadFile( getDictionaryFilenames()[ 0 ] );
+      articleData = GD_NATIVE_TO_WS( L"\n\r\t" ) + gd::toWString( QString( "DICTZIP error: " ) + dict_error_str( dz ) );
     }
-    catch( ... )
+    else
     {
-      free( articleBody );
-      throw;
+      try
+      {
+        articleData =
+          DslIconv::toWstring(
+            DslIconv::getEncodingNameFor( DslEncoding( idxHeader.dslEncoding ) ),
+            articleBody, articleSize );
+        free( articleBody );
+
+        // Strip DSL comments
+        bool b = false;
+        stripComments( articleData, b );
+      }
+      catch( ... )
+      {
+        free( articleBody );
+        throw;
+      }
     }
   }
 
@@ -660,7 +672,7 @@ void DslDictionary::loadArticle( uint32_t address,
 string DslDictionary::dslToHtml( wstring const & str )
 {
  // Normalize the string
-  wstring normalizedStr = gd::toWString( gd::toQString( str ).normalized( QString::NormalizationForm_C ) );
+  wstring normalizedStr = gd::normalize( str );
 
   ArticleDom dom( normalizedStr );
 
@@ -730,6 +742,9 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
                 "_opt_" + QString::number( optionalPartNom++ ).toStdString();
     result += "<div class=\"dsl_opt\" id=\"" + id + "\">" + processNodeChildren( node ) + "</div>";
   }
+  else
+  if ( node.tagName == GD_NATIVE_TO_WS( L"m" ) )
+      result += "<div class=\"dsl_m\">" + processNodeChildren( node ) + "</div>";
   else
   if ( node.tagName.size() == 2 && node.tagName[ 0 ] == L'm' &&
        iswdigit( node.tagName[ 1 ] ) )
@@ -816,10 +831,26 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
 
       if( !imgdata.empty() )
       {
-        QImage img = QImage::fromData( (unsigned char *) &imgdata.front(),
-                                       imgdata.size() );
-        resize = maxPictureWidth > 0
-                 && img.width() > maxPictureWidth;
+        if( Filetype::isNameOfSvg( filename ) )
+        {
+          // We don't need to render svg file now
+
+          QSvgRenderer svg;
+          svg.load( QByteArray::fromRawData( imgdata.data(), imgdata.size() ) );
+          if( svg.isValid() )
+          {
+            QSize imgsize = svg.defaultSize();
+            resize = maxPictureWidth > 0
+                     && imgsize.width() > maxPictureWidth;
+          }
+        }
+        else
+        {
+          QImage img = QImage::fromData( (unsigned char *) &imgdata.front(),
+                                         imgdata.size() );
+          resize = maxPictureWidth > 0
+                   && img.width() > maxPictureWidth;
+        }
       }
 
       if( resize )
@@ -837,6 +868,17 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
                   + "\" alt=\"" + Html::escape( filename ) + "\"/>";
     }
     else
+    if ( Filetype::isNameOfVideo( filename ) ) {
+      QUrl url;
+      url.setScheme( "gdvideo" );
+      url.setHost( QString::fromUtf8( getId().c_str() ) );
+      url.setPath( QString::fromUtf8( filename.c_str() ) );
+
+      result += string( "<a class=\"dsl_s dsl_video\" href=\"" ) + url.toEncoded().data() + "\">"
+             + "<span class=\"img\"></span>"
+             + "<span class=\"filename\">" + processNodeChildren( node ) + "</span>" + "</a>";
+    }
+    else
     {
       // Unknown file type, downgrade to a hyperlink
 
@@ -851,7 +893,12 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
   }
   else
   if ( node.tagName == GD_NATIVE_TO_WS( L"url" ) )
-    result += "<a class=\"dsl_url\" href=\"" + Html::escape( Utf8::encode( node.renderAsText() ) ) +"\">" + processNodeChildren( node ) + "</a>";
+  {
+    string link = Html::escape( Utf8::encode( node.renderAsText() ) );
+    if( QUrl::fromEncoded( link.c_str() ).scheme().isEmpty() )
+      link = "http://" + link;
+    result += "<a class=\"dsl_url\" href=\"" + link +"\">" + processNodeChildren( node ) + "</a>";
+  }
   else
   if ( node.tagName == GD_NATIVE_TO_WS( L"!trs" ) )
     result += "<span class=\"dsl_trs\">" + processNodeChildren( node ) + "</span>";
@@ -942,10 +989,10 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
     url.setScheme( "gdlookup" );
     url.setHost( "localhost" );
     wstring nodeStr = node.renderAsText();
-    ArticleDom nodeDom( nodeStr );
-    url.setPath( gd::toQString( nodeDom.root.renderAsText() ) );
+    normalizeHeadword( nodeStr );
+    url.setPath( gd::toQString( nodeStr ) );
 
-    result += string( "<a class=\"dsl_ref\" href=\"" ) + url.toEncoded().data() +"\">" + processNodeChildren( nodeDom.root ) + "</a>";
+    result += string( "<a class=\"dsl_ref\" href=\"" ) + url.toEncoded().data() +"\">" + processNodeChildren( node ) + "</a>";
   }
   else
   if ( node.tagName == GD_NATIVE_TO_WS( L"sub" ) )
@@ -961,6 +1008,11 @@ string DslDictionary::nodeToHtml( ArticleDom::Node const & node )
   if ( node.tagName == GD_NATIVE_TO_WS( L"t" ) )
   {
     result += "<span class=\"dsl_t\">" + processNodeChildren( node ) + "</span>";
+  }
+  else
+  if ( node.tagName == GD_NATIVE_TO_WS( L"br" ) )
+  {
+    result += "<br />";
   }
   else
     result += "<span class=\"dsl_unknown\">" + processNodeChildren( node ) + "</span>";
@@ -1201,7 +1253,10 @@ void DslArticleRequest::run()
     string articleText, articleAfter;
 
     articleText += "<span class=\"dsl_article\">";
-    articleText += "<div class=\"dsl_headwords\">";
+    articleText += "<div class=\"dsl_headwords\"";
+    if( dict.isFromLanguageRTL() )
+      articleText += " dir=\"rtl\"";
+    articleText += ">";
 
     if( displayedHeadword.size() == 1 && displayedHeadword[0] == '<' )  // Fix special case - "<" header
         articleText += "<";                                             // dslToHtml can't handle it correctly.
@@ -1214,7 +1269,11 @@ void DslArticleRequest::run()
 
     expandTildes( articleBody, tildeValue );
 
-    articleAfter += "<div class=\"dsl_definition\">";
+    articleAfter += "<div class=\"dsl_definition\"";
+    if( dict.isToLanguageRTL() )
+      articleAfter += " dir=\"rtl\"";
+    articleAfter += ">";
+
     articleAfter += dict.dslToHtml( articleBody );
     articleAfter += "</div>";
     articleAfter += "</span>";
@@ -1548,13 +1607,8 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
         // Building the index
         initializing.indexingDictionary( Utf8::encode( scanner.getDictionaryName() ) );
 
-        DPRINTF( "Dictionary name: %ls\n",
-#ifdef Q_OS_WIN
-                 gd::toQString( scanner.getDictionaryName() ).toStdWString().c_str()
-#else
-                 scanner.getDictionaryName().c_str()
-#endif
-        );
+        qDebug() << "Dsl: Building the index for dictionary:"
+                 << gd::toQString( scanner.getDictionaryName() );
 
         File::Class idx( indexFile, "wb" );
 
@@ -1594,7 +1648,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
             for( ; ; )
             {
               // Skip any whitespace
-              if ( !abrvScanner.readNextLine( curString, curOffset ) )
+              if ( !abrvScanner.readNextLineWithoutComments( curString, curOffset ) )
                 break;
               if ( curString.empty() || isDslWs( curString[ 0 ] ) )
                 continue;
@@ -1613,9 +1667,9 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
                 expandOptionalParts( curString, &keys );
 
-                if ( !abrvScanner.readNextLine( curString, curOffset ) || curString.empty() )
+                if ( !abrvScanner.readNextLineWithoutComments( curString, curOffset ) || curString.empty() )
                 {
-                  FDPRINTF( stderr, "Warning: premature end of file %s\n", abrvFileName.c_str() );
+                  qWarning( "Warning: premature end of file %s\n", abrvFileName.c_str() );
                   eof = true;
                   break;
                 }
@@ -1667,8 +1721,8 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
           }
           catch( std::exception & e )
           {
-            FDPRINTF( stderr, "Error reading abrv file %s: %s. Skipping it.\n",
-                     abrvFileName.c_str(), e.what() );
+            qWarning( "Error reading abrv file \"%s\", error: %s. Skipping it.\n",
+                      abrvFileName.c_str(), e.what() );
           }
         }
 
@@ -1682,7 +1736,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
         {
           // Find the main headword
 
-          if ( !hasString && !scanner.readNextLine( curString, curOffset ) )
+          if ( !hasString && !scanner.readNextLineWithoutComments( curString, curOffset ) )
             break; // Clean end of file
 
           hasString = false;
@@ -1701,7 +1755,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
             {
               if ( !isDslWs( curString[ x ] ) )
               {
-                FDPRINTF( stderr, "Warning: garbage string in %s at offset 0x%lX\n", i->c_str(), (unsigned long) curOffset );
+                qWarning( "Warning: garbage string in %s at offset 0x%lX\n", i->c_str(), (unsigned long) curOffset );
                 break;
               }
             }
@@ -1723,9 +1777,9 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
           for( ; ; )
           {
-            if ( ! ( hasString = scanner.readNextLine( curString, curOffset ) ) )
+            if ( ! ( hasString = scanner.readNextLineWithoutComments( curString, curOffset ) ) )
             {
-              FDPRINTF( stderr, "Warning: premature end of file %s\n", i->c_str() );
+              qWarning( "Warning: premature end of file %s\n", i->c_str() );
               break;
             }
 
@@ -1736,13 +1790,9 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
             if ( isDslWs( curString[ 0 ] ) )
               break; // No more headwords
 
-            DPRINTF( "Alt headword: %ls\n",
-#ifdef Q_OS_WIN
-                     gd::toQString( curString ).toStdWString().c_str()
-#else
-                     curString.c_str()
+#ifdef QT_DEBUG
+            qDebug() << "Alt headword" << gd::toQString( curString );
 #endif
-                     );
 
             processUnsortedParts( curString, true );
             expandTildes( curString, allEntryWords.front() );
@@ -1778,7 +1828,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
           for( ; ; )
           {
 
-            if ( ! ( hasString = scanner.readNextLine( curString, curOffset ) )
+            if ( ! ( hasString = scanner.readNextLineWithoutComments( curString, curOffset ) )
                  || ( curString.size() && !isDslWs( curString[ 0 ] ) ) )
             {
               if( insideInsided )
@@ -1824,13 +1874,19 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
             chunks.addToBlock( &(*i).offset, sizeof( (*i).offset ) );
             chunks.addToBlock( &(*i).size, sizeof( (*i).size ) );
 
-            unescapeDsl( (*i).headword );
-            normalizeHeadword( (*i).headword );
+            allEntryWords.clear();
+            expandOptionalParts( (*i).headword, &allEntryWords );
 
-            indexedWords.addWord( (*i).headword, descOffset, maxHeadwordSize );
+            for( list< wstring >::iterator j = allEntryWords.begin();
+                 j != allEntryWords.end(); ++j )
+            {
+              unescapeDsl( *j );
+              normalizeHeadword( *j );
+              indexedWords.addWord( *j, descOffset, maxHeadwordSize );
+            }
 
             ++articleCount;
-            ++wordCount;
+            wordCount += allEntryWords.size();
           }
 
           if ( !hasString )
@@ -1916,8 +1972,8 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
     }
     catch( std::exception & e )
     {
-      FDPRINTF( stderr, "DSL dictionary reading failed: %s:%u, error: %s\n",
-        i->c_str(), atLine, e.what() );
+      qWarning( "DSL dictionary reading failed: %s:%u, error: %s\n",
+                i->c_str(), atLine, e.what() );
     }
   }
 

@@ -6,9 +6,11 @@
 #include "wordlist.hh"
 
 WordList::WordList( QWidget * parent ) : QListWidget( parent )
+, listItemDelegate( itemDelegate() )
 {
   wordFinder = 0;
   translateLine = 0;
+  setItemDelegate( &listItemDelegate );
 }
 
 void WordList::attachFinder( WordFinder * finder )
@@ -78,10 +80,8 @@ void WordList::updateMatchResults( bool finished )
         i->setFont( f );
       }
     }
-    if (i->text().at(0).direction() == QChar::DirR)
-        i->setTextAlignment(Qt::AlignRight);
-    if (i->text().at(0).direction() == QChar::DirL)
-        i->setTextAlignment(Qt::AlignLeft);
+
+    i->setTextAlignment(Qt::AlignLeft);
   }
 
   while ( count() > (int) results.size() )
@@ -114,6 +114,11 @@ void WordList::updateMatchResults( bool finished )
                              20000 , QPixmap( ":/icons/error.png" ) );
   }
 
+  if( !results.empty() && results.front().first.isRightToLeft() )
+    setLayoutDirection( Qt::RightToLeft );
+  else
+    setLayoutDirection( Qt::LeftToRight );
+
   emit contentChanged();
 }
 
@@ -132,4 +137,3 @@ void WordList::refreshTranslateLine()
   }
 
 }
-

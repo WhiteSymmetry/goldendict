@@ -12,6 +12,8 @@
 
 //#define __DO_DEBUG
 
+#define LOG_TO_FILE_KEY "--log-to-file"
+
 #ifdef Q_OS_WIN32
 #include <QtCore/qt_windows.h>
 #endif
@@ -21,8 +23,61 @@
 #endif
 
 #include "termination.hh"
+#include "atomic_rename.hh"
 
 #include <QWebSecurityOrigin>
+#include <QMessageBox>
+#include <QDebug>
+#include <QFile>
+#include <QString>
+
+QFile logFile;
+
+void gdMessageHandler( QtMsgType type, const char *msg )
+{
+  QString message = QString::fromUtf8( msg );
+  switch (type) {
+
+    case QtDebugMsg:
+      if( logFile.isOpen() )
+        message.insert( 0, "Debug: " );
+      else
+        fprintf(stderr, "Debug: %s\n", msg);
+      break;
+
+    case QtWarningMsg:
+      if( logFile.isOpen() )
+        message.insert( 0, "Warning: " );
+      else
+        fprintf(stderr, "Warning: %s\n", msg);
+      break;
+
+    case QtCriticalMsg:
+      if( logFile.isOpen() )
+        message.insert( 0, "Critical: " );
+      else
+        fprintf(stderr, "Critical: %s\n", msg);
+      break;
+
+    case QtFatalMsg:
+      if( logFile.isOpen() )
+      {
+        logFile.write( "Fatal: " );
+        logFile.write( msg );
+        logFile.flush();
+      }
+      else
+        fprintf(stderr, "Fatal: %s\n", msg);
+      abort();
+  }
+
+  if( logFile.isOpen() )
+  {
+    message.append( "\n" );
+    logFile.write( message.toUtf8() );
+    logFile.flush();
+  }
+}
 
 int main( int argc, char ** argv )
 {
@@ -92,17 +147,17 @@ int main( int argc, char ** argv )
 
   if ( app.isRunning() )
   {
-    if( argc == 2 )
+    if( argc == 2 && strcmp( argv[ 1 ], LOG_TO_FILE_KEY ) != 0 )
 #ifdef Q_OS_WIN32
     {
       LPWSTR * pstr;
       int num;
       pstr = CommandLineToArgvW( GetCommandLineW(), &num );
       if( pstr && num > 0 )
-        app.sendMessage( QString( "translateWord: ") + QString::fromWCharArray( pstr[1] ) );
+        app.sendMessage( QString( "translateWord: " ) + QString::fromWCharArray( pstr[1] ) );
     }
 #else
-      app.sendMessage( QString( "translateWord: ") + QString::fromLocal8Bit( argv[1] ) );
+      app.sendMessage( QString( "translateWord: " ) + QString::fromLocal8Bit( argv[1] ) );
 #endif
     else
       app.sendMessage("bringToFront");
@@ -111,15 +166,66 @@ int main( int argc, char ** argv )
 
   app.setApplicationName( "GoldenDict" );
   app.setOrganizationDomain( "http://goldendict.org/" );
+#if QT_VERSION >= 0x040600
   app.setStyle(new GdAppStyle);
+#endif
 
   #ifndef Q_OS_MAC
     app.setWindowIcon( QIcon( ":/icons/programicon.png" ) );
-  #else
-    app.setWindowIcon( QIcon( ":/icons/macicon.png" ) );
   #endif
 
-  Config::Class cfg( Config::load() );
+  // Load translations for system locale
+
+  QTranslator qtTranslator;
+
+  QString localeName = QLocale::system().name();
+
+  if ( !qtTranslator.load( "qt_" + localeName, Config::getLocDir() ) )
+    qtTranslator.load( "qt_" + localeName,
+                       QLibraryInfo::location( QLibraryInfo::TranslationsPath ) );
+
+  app.installTranslator( &qtTranslator );
+
+  QTranslator translator;
+
+  translator.load( Config::getLocDir() + "/" + localeName );
+
+  app.installTranslator( &translator );
+
+  Config::Class cfg;
+  for( ; ; )
+  {
+    try
+    {
+      cfg = Config::load();
+    }
+    catch( Config::exError )
+    {
+      QMessageBox mb( QMessageBox::Warning, app.applicationName(),
+                      app.translate( "Main", "Error in configuration file. Continue with default settings?" ),
+                      QMessageBox::Yes | QMessageBox::No );
+      mb.exec();
+      if( mb.result() != QMessageBox::Yes )
+        return -1;
+
+      QString configFile = Config::getConfigFileName();
+      renameAtomically( configFile, configFile + ".bad" );
+      continue;
+    }
+    break;
+  }
+
+  if( argc == 2 && strcmp( argv[ 1 ], LOG_TO_FILE_KEY ) == 0 )
+  {
+    // Open log file
+    logFile.setFileName( Config::getConfigDir() + "gd_log.txt" );
+    logFile.remove();
+    logFile.open( QFile::ReadWrite );
+
+    // Install message handler
+    qInstallMsgHandler( gdMessageHandler );
+  }
+
 
   if ( Config::isPortableVersion() )
   {
@@ -131,26 +237,18 @@ int main( int argc, char ** argv )
     cfg.hunspell.dictionariesPath = Config::getPortableVersionMorphoDir();
   }
 
-  // Load translations
+  // Reload translations for user selected locale is nesessary
 
-  QTranslator qtTranslator;
+  if( !cfg.preferences.interfaceLanguage.isEmpty() && localeName != cfg.preferences.interfaceLanguage )
+  {
+    localeName = cfg.preferences.interfaceLanguage;
 
-  QString localeName = cfg.preferences.interfaceLanguage;
+    if ( !qtTranslator.load( "qt_" + localeName, Config::getLocDir() ) )
+      qtTranslator.load( "qt_" + localeName,
+                                 QLibraryInfo::location( QLibraryInfo::TranslationsPath ) );
 
-  if ( localeName.isEmpty() )
-    localeName = QLocale::system().name();
-
-  if ( !qtTranslator.load( "qt_" + localeName,
-                           QLibraryInfo::location( QLibraryInfo::TranslationsPath ) ) )
-    qtTranslator.load( "qt_" + localeName, Config::getProgramDataDir() + "/locale/" );
-
-  app.installTranslator( &qtTranslator );
-
-  QTranslator translator;
-
-  translator.load( Config::getLocDir() + "/" + localeName );
-
-  app.installTranslator( &translator );
+    translator.load( Config::getLocDir() + "/" + localeName );
+  }
 
   // Prevent app from quitting spontaneously when it works with scan popup
   // and with the main window closed.
@@ -169,7 +267,7 @@ int main( int argc, char ** argv )
   QObject::connect( &app, SIGNAL(messageReceived(const QString&)),
     &m, SLOT(messageFromAnotherInstanceReceived(const QString&)));
 
-  if( argc == 2 )
+  if( argc == 2 && strcmp( argv[ 1 ], LOG_TO_FILE_KEY ) != 0)
 #ifdef Q_OS_WIN32
   {
     LPWSTR * pstr;
@@ -185,6 +283,9 @@ int main( int argc, char ** argv )
   int r = app.exec();
 
   app.removeDataCommiter( m );
+
+  if( logFile.isOpen() )
+    logFile.close();
 
   return r;
 }

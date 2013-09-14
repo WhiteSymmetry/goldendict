@@ -4,7 +4,7 @@
 #include "langcoder.hh"
 #include <QMessageBox>
 #include "broken_xrecord.hh"
-#include "bass.hh"
+
 
 Preferences::Preferences( QWidget * parent, Config::Preferences const & p ):
   QDialog( parent ), prevInterfaceLanguage( 0 )
@@ -77,9 +77,12 @@ Preferences::Preferences( QWidget * parent, Config::Preferences const & p ):
       break;
     }
 
-  ui.displayStyle->addItem( QIcon( ":/icons/programicon.png" ), tr( "Default" ), QString() );
+  ui.displayStyle->addItem( QIcon( ":/icons/programicon_old.png" ), tr( "Default" ), QString() );
+  ui.displayStyle->addItem( QIcon( ":/icons/programicon.png" ), tr( "Modern" ), QString( "modern" ) );
   ui.displayStyle->addItem( QIcon( ":/icons/icon32_dsl.png" ), tr( "Lingvo" ), QString( "lingvo" ) );
   ui.displayStyle->addItem( QIcon( ":/icons/icon32_bgl.png" ), tr( "Babylon" ), QString( "babylon" ) );
+  ui.displayStyle->addItem( QIcon( ":/icons/icon32_lingoes.png" ), tr( "Lingoes" ), QString( "lingoes" ) );
+  ui.displayStyle->addItem( QIcon( ":/icons/icon32_lingoes.png" ), tr( "Lingoes-Blue" ), QString( "lingoes-blue" ) );
 
   for( int x = 0; x < ui.displayStyle->count(); ++x )
     if ( ui.displayStyle->itemData( x ).toString() == p.displayStyle )
@@ -132,6 +135,11 @@ Preferences::Preferences( QWidget * parent, Config::Preferences const & p ):
   ui.historySaveIntervalField->setValue( p.historyStoreInterval );
   ui.alwaysExpandOptionalParts->setChecked( p.alwaysExpandOptionalParts );
 
+  ui.collapseBigArticles->setChecked( p.collapseBigArticles );
+  ui.articleSizeLimit->setValue( p.articleSizeLimit );
+
+  ui.maxDictsInContextMenu->setValue( p.maxDictionaryRefsInContextMenu );
+
   // Different platforms have different keys available
 
 #ifdef Q_OS_WIN32
@@ -154,27 +162,17 @@ Preferences::Preferences( QWidget * parent, Config::Preferences const & p ):
 
   // Sound
 
-#ifdef Q_WS_WIN
-  // Since there's only one Phonon backend under Windows, be more precise
-  ui.playViaPhonon->setText( tr( "Play via DirectShow" ) );
-  ui.playViaBass->setEnabled( BassAudioPlayer::instance().canBeUsed() );
-#else
-  // This setting is Windows-specific
-  ui.useWindowsPlaySound->hide();
-  ui.playViaBass->hide();
-#endif
-
   ui.pronounceOnLoadMain->setChecked( p.pronounceOnLoadMain );
   ui.pronounceOnLoadPopup->setChecked( p.pronounceOnLoadPopup );
 
-  ui.useExternalPlayer->setChecked( p.useExternalPlayer );
-
-#ifdef Q_WS_WIN
-  if ( p.useWindowsPlaySound && !p.useExternalPlayer )
-    ui.useWindowsPlaySound->setChecked( true );
-  else if( p.useBassLibrary && !p.useExternalPlayer && BassAudioPlayer::instance().canBeUsed() )
-    ui.playViaBass->setChecked( true );
+#ifdef DISABLE_INTERNAL_PLAYER
+  ui.useInternalPlayer->hide();
+#else
+  if ( p.useInternalPlayer )
+    ui.useInternalPlayer->setChecked( true );
+  else
 #endif
+    ui.useExternalPlayer->setChecked( p.useExternalPlayer );
 
   ui.audioPlaybackProgram->setText( p.audioPlaybackProgram );
 
@@ -200,6 +198,7 @@ Preferences::Preferences( QWidget * parent, Config::Preferences const & p ):
   ui.checkForNewReleases->setChecked( p.checkForNewReleases );
   ui.disallowContentFromOtherSites->setChecked( p.disallowContentFromOtherSites );
   ui.enableWebPlugins->setChecked( p.enableWebPlugins );
+  ui.hideGoldenDictHeader->setChecked( p.hideGoldenDictHeader );
 
   // Add-on styles
   ui.addonStylesLabel->setVisible( ui.addonStyles->count() > 1 );
@@ -262,13 +261,15 @@ Config::Preferences Preferences::getPreferences()
   p.historyStoreInterval = ui.historySaveIntervalField->text().toUInt();
   p.alwaysExpandOptionalParts = ui.alwaysExpandOptionalParts->isChecked();
 
+  p.collapseBigArticles = ui.collapseBigArticles->isChecked();
+  p.articleSizeLimit = ui.articleSizeLimit->text().toInt();
+
+  p.maxDictionaryRefsInContextMenu = ui.maxDictsInContextMenu->text().toInt();
+
   p.pronounceOnLoadMain = ui.pronounceOnLoadMain->isChecked();
   p.pronounceOnLoadPopup = ui.pronounceOnLoadPopup->isChecked();
   p.useExternalPlayer = ui.useExternalPlayer->isChecked();
-#ifdef Q_WS_WIN
-  p.useWindowsPlaySound = ui.useWindowsPlaySound->isChecked();
-  p.useBassLibrary = ui.playViaBass->isChecked();
-#endif
+  p.useInternalPlayer = ui.useInternalPlayer->isChecked();
   p.audioPlaybackProgram = ui.audioPlaybackProgram->text();
 
   p.proxyServer.enabled = ui.useProxyServer->isChecked();
@@ -284,6 +285,7 @@ Config::Preferences Preferences::getPreferences()
   p.checkForNewReleases = ui.checkForNewReleases->isChecked();
   p.disallowContentFromOtherSites = ui.disallowContentFromOtherSites->isChecked();
   p.enableWebPlugins = ui.enableWebPlugins->isChecked();
+  p.hideGoldenDictHeader = ui.hideGoldenDictHeader->isChecked();
 
   p.addonStyle = ui.addonStyles->getCurrentStyle();
 

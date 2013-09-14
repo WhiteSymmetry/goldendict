@@ -13,6 +13,8 @@
 #include "groupcombobox.hh"
 #include "ui_articleview.h"
 
+class ResourceToSaveHandler;
+
 /// A widget with the web view tailored to view and handle articles -- it
 /// uses the appropriate netmgr, handles link clicks, rmb clicks etc
 class ArticleView: public QFrame
@@ -28,16 +30,11 @@ class ArticleView: public QFrame
   Ui::ArticleView ui;
 
   QAction pasteAction, articleUpAction, articleDownAction,
-          goBackAction, goForwardAction, openSearchAction, selectCurrentArticleAction;
+          goBackAction, goForwardAction, openSearchAction, selectCurrentArticleAction,
+          copyAsTextAction, inspectAction;
   bool searchIsOpened;
   bool expandOptionalParts;
   QString articleToJump;
-  QString soundScript;
-
-#ifdef Q_OS_WIN32
-    // Used in Windows only for PlaySound mode
-    vector< char > winWavData;
-#endif
 
   /// Any resource we've decided to download off the dictionary gets stored here.
   /// Full vector capacity is used for search requests, where we have to make
@@ -45,9 +42,6 @@ class ArticleView: public QFrame
   std::list< sptr< Dictionary::DataRequest > > resourceDownloadRequests;
   /// Url of the resourceDownloadRequests
   QUrl resourceDownloadUrl;
-
-  std::list< sptr< Dictionary::DataRequest > > resourceToSaveDownloadRequests;
-  QUrl resourceToSaveUrl;
 
   /// For resources opened via desktop services
   QString desktopOpenedTempFile;
@@ -157,7 +151,7 @@ public:
 
   /// Jumps to the article specified by the dictionary id,
   /// by executing a javascript code.
-  void jumpToDictionary( QString const & );
+  void jumpToDictionary( QString const &, bool force );
 
   /// Returns all articles currently present in view, as a list of dictionary
   /// string ids.
@@ -165,6 +159,9 @@ public:
 
   /// Returns the dictionary id of the currently active article in the view.
   QString getActiveArticleId();
+
+  std::vector< ResourceToSaveHandler * > saveResource( const QUrl & url, const QString & fileName );
+  std::vector< ResourceToSaveHandler * > saveResource( const QUrl & url, const QUrl & ref, const QString & fileName );
 
 signals:
 
@@ -242,7 +239,6 @@ private slots:
   void contextMenuRequested( QPoint const & );
 
   void resourceDownloadFinished();
-  void resourceToSaveDownloadFinished();
 
   /// We handle pasting by attempting to define the word in clipboard.
   void pasteTriggered();
@@ -264,6 +260,15 @@ private slots:
 
   /// Handles the double-click from the definition.
   void doubleClicked();
+
+  /// Handles audio player error message
+  void audioPlayerError( QString const & message );
+
+  /// Copy current selection as plain text
+  void copyAsText();
+
+  /// Inspect element
+  void inspect();
 
 private:
 
@@ -313,8 +318,6 @@ private:
   /// for the given group. If there are none, returns empty string.
   QString getMutedForGroup( unsigned group );
 
-  void saveResource( QUrl const &, QUrl const & );
-
 protected:
 
   // We need this to hide the search bar when we're showed
@@ -332,6 +335,26 @@ public:
   QString wordAtPoint( int x, int y );
 #endif
 
+};
+
+class ResourceToSaveHandler: public QObject
+{
+  Q_OBJECT
+
+public:
+  explicit ResourceToSaveHandler( ArticleView * view, sptr< Dictionary::DataRequest > req,
+                                  QString const & fileName );
+
+signals:
+  void done();
+  void statusBarMessage( QString const & message, int timeout = 0, QPixmap const & pixmap = QPixmap() );
+
+private slots:
+  void downloadFinished();
+
+private:
+  sptr< Dictionary::DataRequest > req;
+  QString fileName;
 };
 
 #endif

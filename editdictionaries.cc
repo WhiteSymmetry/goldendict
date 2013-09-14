@@ -16,8 +16,7 @@ EditDictionaries::EditDictionaries( QWidget * parent, Config::Class & cfg_,
   groupInstances( groupInstances_ ),
   dictNetMgr( dictNetMgr_ ),
   origCfg( cfg ),
-  sources( this, cfg.paths, cfg.soundDirs, cfg.hunspell, cfg.transliteration,
-           cfg.forvo, cfg.mediawikis, cfg.webSites, cfg.programs ),
+  sources( this, cfg ),
   orderAndProps( new OrderAndProps( this, cfg.dictionaryOrder, cfg.inactiveDictionaries,
                                     dictionaries ) ),
   groups( new Groups( this, dictionaries, cfg.groups, orderAndProps->getCurrentDictionaryOrder() ) ),
@@ -49,7 +48,7 @@ EditDictionaries::EditDictionaries( QWidget * parent, Config::Class & cfg_,
   connect( &sources, SIGNAL( rescan() ), this, SLOT( rescanSources() ) );
 
   connect( groups.get(), SIGNAL( showDictionaryInfo( QString const & ) ),
-           this, SLOT( showDictionaryInfo(QString const & ) ) );
+           this, SIGNAL( showDictionaryInfo(QString const & ) ) );
 }
 
 void EditDictionaries::editGroup( unsigned id )
@@ -162,7 +161,8 @@ bool EditDictionaries::isSourcesChanged() const
          sources.getForvo() != cfg.forvo ||
          sources.getMediaWikis() != cfg.mediawikis ||
          sources.getWebSites() != cfg.webSites ||
-         sources.getPrograms() != cfg.programs;
+         sources.getPrograms() != cfg.programs ||
+         sources.getVoiceEngines() != cfg.voiceEngines;
 }
 
 void EditDictionaries::acceptChangedSources( bool rebuildGroups )
@@ -181,6 +181,7 @@ void EditDictionaries::acceptChangedSources( bool rebuildGroups )
   cfg.mediawikis = sources.getMediaWikis();
   cfg.webSites = sources.getWebSites();
   cfg.programs = sources.getPrograms();
+  cfg.voiceEngines = sources.getVoiceEngines();
 
   groupInstances.clear(); // Those hold pointers to dictionaries, we need to
                           // free them.
@@ -233,19 +234,5 @@ void EditDictionaries::acceptChangedSources( bool rebuildGroups )
 
     if ( noInactiveEdits )
       origCfg.inactiveDictionaries = orderAndProps->getCurrentInactiveDictionaries();
-  }
-}
-
-void EditDictionaries::showDictionaryInfo( QString const & dictId )
-{
-  unsigned n;
-  for( n = 0; n < dictionaries.size(); n++ )
-    if( dictId.compare( QString::fromUtf8( dictionaries[ n ]->getId().c_str() ) ) == 0 )
-      break;
-  if( n < dictionaries.size() )
-  {
-    DictInfo infoMsg( cfg, this );
-    infoMsg.showInfo( dictionaries[ n ] );
-    infoMsg.exec();
   }
 }

@@ -90,7 +90,7 @@ QNetworkReply * ArticleNetworkAccessManager::createRequest( Operation op,
     if ( !req.url().host().endsWith( refererUrl.host() ) &&
          getHostBase( req.url() ) != getHostBase( refererUrl ) && !req.url().scheme().startsWith("data") )
     {
-      DPRINTF( "Blocking element %s\n", req.url().toEncoded().data() );
+      qWarning( "Blocking element \"%s\"\n", req.url().toEncoded().data() );
 
       return new BlockedNetworkReply( this );
     }
@@ -110,6 +110,14 @@ QNetworkReply * ArticleNetworkAccessManager::createRequest( Operation op,
 
       return QNetworkAccessManager::createRequest( op, newReq, outgoingData );
     }
+  }
+
+  // spoof User-Agent
+  if ( hideGoldenDictHeader && req.url().scheme().startsWith("http", Qt::CaseInsensitive))
+  {
+    QNetworkRequest newReq( req );
+    newReq.setRawHeader("User-Agent", req.rawHeader("User-Agent").replace(qApp->applicationName(), ""));
+    return QNetworkAccessManager::createRequest( op, newReq, outgoingData );
   }
 
   return QNetworkAccessManager::createRequest( op, req, outgoingData );
@@ -162,7 +170,7 @@ sptr< Dictionary::DataRequest > ArticleNetworkAccessManager::getResource(
       return articleMaker.makeDefinitionFor( word, group, contexts, mutedDicts );
   }
 
-  if ( ( url.scheme() == "bres" || url.scheme() == "gdau" || url.scheme() == "gico" ) &&
+  if ( ( url.scheme() == "bres" || url.scheme() == "gdau" || url.scheme() == "gdvideo" || url.scheme() == "gico" ) &&
        url.path().size() )
   {
     //DPRINTF( "Get %s\n", req.url().host().toLocal8Bit().data() );
@@ -189,7 +197,16 @@ sptr< Dictionary::DataRequest > ArticleNetworkAccessManager::getResource(
                 memcpy( &( ico->getData().front() ), bytes.data(), bytes.size() );
                 return ico;
             }
-            return  dictionaries[ x ]->getResource( url.path().mid( 1 ).toUtf8().data() );
+            try
+            {
+              return  dictionaries[ x ]->getResource( url.path().mid( 1 ).toUtf8().data() );
+            }
+            catch( std::exception & e )
+            {
+              qWarning( "getResource request error (%s) in \"%s\"\n", e.what(),
+                        dictionaries[ x ]->getName().c_str() );
+              return sptr< Dictionary::DataRequest >();
+            }
         }
     }
     else
@@ -293,6 +310,11 @@ qint64 ArticleResourceReply::bytesAvailable() const
 
 qint64 ArticleResourceReply::readData( char * out, qint64 maxSize )
 {
+  // From the doc: "This function might be called with a maxSize of 0,
+  // which can be used to perform post-reading operations".
+  if ( maxSize == 0 )
+    return 0;
+
   DPRINTF( "====reading %d bytes\n", (int)maxSize );
 
   bool finished = req->isFinished();
@@ -306,7 +328,14 @@ qint64 ArticleResourceReply::readData( char * out, qint64 maxSize )
   
   size_t toRead = maxSize < left ? maxSize : left;
 
-  req->getDataSlice( alreadyRead, toRead, out );
+  try
+  {
+    req->getDataSlice( alreadyRead, toRead, out );
+  }
+  catch( std::exception & e )
+  {
+    qWarning( "getDataSlice error: %s\n", e.what() );
+  }
 
   alreadyRead += toRead;
 

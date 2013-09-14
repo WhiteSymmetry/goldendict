@@ -13,6 +13,7 @@
 #include "ex.hh"
 #include "mutex.hh"
 #include "wstring.hh"
+#include "langcoder.hh"
 
 /// Abstract dictionary-related stuff
 namespace Dictionary {
@@ -267,6 +268,9 @@ protected:
   // else treat filename as name without extension
   bool loadIconFromFile( QString const & filename, bool isFullName = false );
 
+  /// Make css content usable only for articles from this dictionary
+  void isolateCSS( QString & css, QString const & wrapperSelector = QString() );
+
 public:
 
   /// Creates a dictionary. The id should be made using
@@ -385,6 +389,16 @@ public:
 
   // Return dictionary main file name
   virtual QString getMainFilename();
+
+  /// Check text direction
+  bool isFromLanguageRTL()
+  { return LangCoder::isLanguageRTL( getLangFrom() ); }
+  bool isToLanguageRTL()
+  { return LangCoder::isLanguageRTL( getLangTo() ); }
+
+  /// Return true if dictionary is local dictionary
+  virtual bool isLocalDictionary()
+  { return false; }
 
   virtual ~Class()
   {}

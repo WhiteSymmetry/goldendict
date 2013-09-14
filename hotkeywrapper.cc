@@ -60,6 +60,10 @@ HotkeyStruct::HotkeyStruct( quint32 key_, quint32 key2_, quint32 modifier_,
   modifier( modifier_ ),
   handle( handle_ ),
   id( id_ )
+#ifdef Q_OS_MACX
+  , hkRef( 0 )
+  , hkRef2( 0 )
+#endif
 {
 }
 
@@ -118,22 +122,88 @@ bool HotkeyWrapper::checkState(quint32 vk, quint32 mod)
     if (hs.key == vk && hs.modifier == mod) {
 
       #ifdef Q_WS_WIN32
-      // If that was a copy-to-clipboard shortcut, re-emit it back so it could
-      // reach its original destination so it could be acted upon.
-      if ( ( vk == VK_INSERT || vk == 'c' || vk == 'C' ) && mod == MOD_CONTROL )
+
+      if( hs.key2 != 0 || ( mod == MOD_CONTROL && ( vk == VK_INSERT || vk == 'c' || vk == 'C' ) ) )
       {
-        INPUT i[ 2 ];
-  
+        // Pass-through first part of compound hotkey or clipdoard copy command
+
+        INPUT i[ 10 ];
         memset( i, 0, sizeof( i ) );
-  
-        i[ 0 ].type = INPUT_KEYBOARD;
-        i[ 0 ].ki.wVk = 'C';
-        i[ 1 ].type = INPUT_KEYBOARD;
-        i[ 1 ].ki.wVk = 'C';
-        i[ 1 ].ki.dwFlags = KEYEVENTF_KEYUP;
-  
+        int nextKeyNom = 0;
+        short emulateModKeys = 0;
+
+        // If modifier keys aren't pressed it looks like emulation
+        // We then also emulate full sequence
+
+        if( ( mod & MOD_ALT ) != 0 && ( GetAsyncKeyState( VK_MENU ) & 0x8000 ) == 0 )
+        {
+          emulateModKeys |= MOD_ALT;
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_MENU;
+          nextKeyNom += 1;
+        }
+        if( ( mod & MOD_CONTROL ) != 0 && ( GetAsyncKeyState( VK_CONTROL ) & 0x8000 ) == 0 )
+        {
+          emulateModKeys |= MOD_CONTROL;
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_CONTROL;
+          nextKeyNom += 1;
+        }
+        if( ( mod & MOD_SHIFT ) != 0 && ( GetAsyncKeyState( VK_SHIFT ) & 0x8000 ) == 0 )
+        {
+          emulateModKeys |= MOD_SHIFT;
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_SHIFT;
+          nextKeyNom += 1;
+        }
+        if( ( mod & MOD_WIN ) != 0 && ( GetAsyncKeyState( VK_LWIN ) & 0x8000 ) == 0
+            && ( GetAsyncKeyState( VK_RWIN ) & 0x8000 ) == 0 )
+        {
+          emulateModKeys |= MOD_WIN;
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_LWIN;
+          nextKeyNom += 1;
+        }
+
+        i[ nextKeyNom ].type = INPUT_KEYBOARD;
+        i[ nextKeyNom ].ki.wVk = vk;
+        nextKeyNom += 1;
+        i[ nextKeyNom ].type = INPUT_KEYBOARD;
+        i[ nextKeyNom ].ki.wVk = vk;
+        i[ nextKeyNom ].ki.dwFlags = KEYEVENTF_KEYUP;
+        nextKeyNom += 1;
+
+        if( emulateModKeys & MOD_WIN )
+        {
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_LWIN;
+          i[ nextKeyNom ].ki.dwFlags = KEYEVENTF_KEYUP;
+          nextKeyNom += 1;
+        }
+        if( emulateModKeys & MOD_SHIFT )
+        {
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_SHIFT;
+          i[ nextKeyNom ].ki.dwFlags = KEYEVENTF_KEYUP;
+          nextKeyNom += 1;
+        }
+        if( emulateModKeys & MOD_CONTROL )
+        {
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_CONTROL;
+          i[ nextKeyNom ].ki.dwFlags = KEYEVENTF_KEYUP;
+          nextKeyNom += 1;
+        }
+        if( emulateModKeys & MOD_ALT )
+        {
+          i[ nextKeyNom ].type = INPUT_KEYBOARD;
+          i[ nextKeyNom ].ki.wVk = VK_MENU;
+          i[ nextKeyNom ].ki.dwFlags = KEYEVENTF_KEYUP;
+          nextKeyNom += 1;
+        }
+
         UnregisterHotKey( hwnd, hs.id );
-        SendInput( 2, i, sizeof( *i ) );
+        SendInput( nextKeyNom, i, sizeof( *i ) );
         RegisterHotKey(hwnd, hs.id, hs.modifier, hs.key);
       }
       #endif
@@ -492,16 +562,76 @@ bool HotkeyWrapper::isKeyGrabbed( quint32 keyCode, quint32 modifiers ) const
   return i != grabbedKeys.end();
 }
 
+namespace {
+
+typedef int (*X11ErrorHandler) ( Display * display, XErrorEvent * event );
+
+class X11GrabUngrabErrorHandler {
+public:
+  static bool error;
+
+  static int grab_ungrab_error_handler( Display *, XErrorEvent * event )
+  {
+    qDebug() << "grab_ungrab_error_handler is invoked";
+    switch ( event->error_code )
+    {
+      case BadAccess:
+      case BadValue:
+      case BadWindow:
+        if ( event->request_code == 33 /* X_GrabKey */ ||
+             event->request_code == 34 /* X_UngrabKey */)
+        {
+          error = true;
+        }
+    }
+    return 0;
+  }
+
+  X11GrabUngrabErrorHandler()
+  {
+    error = false;
+    previousErrorHandler_ = XSetErrorHandler( grab_ungrab_error_handler );
+  }
+
+  ~X11GrabUngrabErrorHandler()
+  {
+    XFlush( QX11Info::display() );
+    (void) XSetErrorHandler( previousErrorHandler_ );
+  }
+
+  bool isError() const
+  {
+    XFlush( QX11Info::display() );
+    return error;
+  }
+
+private:
+  X11ErrorHandler previousErrorHandler_;
+};
+
+bool X11GrabUngrabErrorHandler::error = false;
+
+} // anonymous namespace
+
+
 HotkeyWrapper::GrabbedKeys::iterator HotkeyWrapper::grabKey( quint32 keyCode,
                                                              quint32 modifiers )
 {
   std::pair< GrabbedKeys::iterator, bool > result =
     grabbedKeys.insert( std::make_pair( keyCode, modifiers ) );
 
+
   if ( result.second )
   {
+    X11GrabUngrabErrorHandler errorHandler;
     XGrabKey( QX11Info::display(), keyCode, modifiers, QX11Info::appRootWindow(),
               True, GrabModeAsync, GrabModeAsync );
+
+    if ( errorHandler.isError() )
+    {
+      qDebug() << "Warning: Possible hotkeys conflict. Check your hotkeys options.";
+      ungrabKey( result.first );
+    }
   }
 
   return result.first;
@@ -509,9 +639,15 @@ HotkeyWrapper::GrabbedKeys::iterator HotkeyWrapper::grabKey( quint32 keyCode,
 
 void HotkeyWrapper::ungrabKey( GrabbedKeys::iterator i )
 {
+  X11GrabUngrabErrorHandler errorHandler;
   XUngrabKey( QX11Info::display(), i->first, i->second, QX11Info::appRootWindow() );
 
   grabbedKeys.erase( i );
+
+  if ( errorHandler.isError() )
+  {
+    qDebug() << "Warning: Cannot ungrab the hotkey";
+  }
 }
 
 quint32 HotkeyWrapper::nativeKey(int key)

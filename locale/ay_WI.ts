@@ -43,6 +43,10 @@
         <source>(c) 2008-2013 Konstantin Isakov (ikm@goldendict.org)</source>
         <translation>(c) 2008-2013 Konstantin Isakov (ikm@users.berlios.de)</translation>
     </message>
+    <message>
+        <source>Based on Qt %1 (%2, %3 bit)</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ArticleMaker</name>
@@ -86,6 +90,14 @@
         <source>(picture)</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Expand article</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Collapse article</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ArticleRequest</name>
@@ -112,6 +124,14 @@
     <message>
         <source>Individual words: </source>
         <translation>Sapa arunaka:</translation>
+    </message>
+    <message>
+        <source>Expand article</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Collapse article</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -154,11 +174,11 @@
     </message>
     <message>
         <source>Playing a non-WAV file</source>
-        <translation>Jan WAV uka kipumpi  jaylliyaña</translation>
+        <translation type="obsolete">Jan WAV uka kipumpi  jaylliyaña</translation>
     </message>
     <message>
         <source>To enable playback of files different than WAV, please go to Edit|Preferences, choose the Audio tab and select &quot;Play via DirectShow&quot; there.</source>
-        <translation>Jaylliyañ sartayañatakix jan WAV ukampikix, por favor vaya a Editar|Preferencias, escoja la pestaña Audio y seleccione &quot;Reproducir con DirectShow&quot;.</translation>
+        <translation type="obsolete">Jaylliyañ sartayañatakix jan WAV ukampikix, por favor vaya a Editar|Preferencias, escoja la pestaña Audio y seleccione &quot;Reproducir con DirectShow&quot;.</translation>
     </message>
     <message>
         <source>Failed to run a player to play sound file: %1</source>
@@ -249,14 +269,6 @@
         <translation type="unfinished">akataraki : %1</translation>
     </message>
     <message>
-        <source>Bass library not found.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Bass library can&apos;t play this sound.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Select Current Article</source>
         <translation type="unfinished"></translation>
     </message>
@@ -281,15 +293,35 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Resource saving error: </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Save &amp;image...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Save s&amp;ound...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TTS Voice</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WARNING: FFmpeg Audio Player: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy as text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Inspect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Video</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Video: %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -413,6 +445,19 @@ between classic and school orthography in cyrillic)</source>
         <source>Description:</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Open folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit dictionary</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit the dictionary via command:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>DictListModel</name>
@@ -441,6 +486,14 @@ between classic and school orthography in cyrillic)</source>
     </message>
     <message>
         <source>&amp;Dictionary Bar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open dictionary folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Extended menu with all dictionaries...</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2270,12 +2323,23 @@ between classic and school orthography in cyrillic)</source>
         <source>Tamazight</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Lojban</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>LoadDictionaries</name>
     <message>
         <source>Error loading dictionaries</source>
         <translation>Phanthawi aru pirwa uchaña</translation>
+    </message>
+</context>
+<context>
+    <name>Main</name>
+    <message>
+        <source>Error in configuration file. Continue with default settings?</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -2338,7 +2402,7 @@ between classic and school orthography in cyrillic)</source>
     </message>
     <message>
         <source>Html files (*.html *.htm)</source>
-        <translation>Archivos HTML (*.html *.htm)</translation>
+        <translation type="obsolete">Archivos HTML (*.html *.htm)</translation>
     </message>
     <message>
         <source>Error</source>
@@ -2744,6 +2808,37 @@ between classic and school orthography in cyrillic)</source>
         <source>&amp;History Pane</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Accessibility API is not enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Article, Complete (*.html)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Article, HTML Only (*.html)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saving article...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open dictionary folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>Mdx::MdxArticleRequest</name>
+    <message>
+        <source>Dictionary file was tampered or corrupted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed loading article from %1, reason: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>MediaWiki::MediaWikiArticleRequest</name>
@@ -3137,22 +3232,22 @@ p, li { white-space: pre-wrap; }
     <message>
         <source>Use Windows native playback API. Limited to .wav files only,
 but works very well.</source>
-        <translation>Apnaqaña API nativa de Windows apnakañataki
+        <translation type="obsolete">Apnaqaña API nativa de Windows apnakañataki
 a archivos .wav,askiwa.</translation>
     </message>
     <message>
         <source>Play via Windows native API</source>
-        <translation>API apnaqaña nativa de Windows</translation>
+        <translation type="obsolete">API apnaqaña nativa de Windows</translation>
     </message>
     <message>
         <source>Play audio via Phonon framework. May be somewhat unstable,
 but should support most audio file formats.</source>
-        <translation>Arst&apos;awi Phonon arst&apos;awayi. inach janiw sumaniti, 
+        <translation type="obsolete">Arst&apos;awi Phonon arst&apos;awayi. inach janiw sumaniti, 
 taxpach arunaka apnakispawa</translation>
     </message>
     <message>
         <source>Play via Phonon</source>
-        <translation>Phononmpi arst&apos;asi </translation>
+        <translation type="obsolete">Phononmpi arst&apos;asi </translation>
     </message>
     <message>
         <source>Use any external program to play audio files</source>
@@ -3245,7 +3340,7 @@ download page.</source>
     </message>
     <message>
         <source>Play via DirectShow</source>
-        <translation>DirectShow </translation>
+        <translation type="obsolete">DirectShow </translation>
     </message>
     <message>
         <source>Changing Language</source>
@@ -3294,15 +3389,6 @@ With this on however, it will hide the main window.</source>
     </message>
     <message>
         <source>Send translated word to main window</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Play audio via Bass library. Optimal choice. To use this mode
-you must place bass.dll (http://www.un4seen.com) into GoldenDict folder.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Play via Bass library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3402,6 +3488,59 @@ It is not needed to select this option if you don&apos;t use such programs.</sou
         <source>minutes</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Modern</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lingoes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lingoes-Blue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Play audio files via FFmpeg(libav) and libao</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use internal player</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Some sites detect GoldenDict via HTTP headers and block the requests.
+Enable this option to workaround the problem.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Do not identify GoldenDict in HTTP headers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select this option to automatic collapse big articles</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Collapse articles more than</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>symbols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust this value to avoid huge context menus.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Context menu dictionaries limit:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Articles longer than this size will be collapsed</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ProgramTypeEditor</name>
@@ -3465,6 +3604,85 @@ It is not needed to select this option if you don&apos;t use such programs.</sou
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>Article loading error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Article decoding error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avformat_alloc_context() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>av_malloc() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avio_alloc_context() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avformat_open_input() failed: %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avformat_find_stream_info() failed: %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not find audio stream.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Codec [id: %1] not found.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avcodec_open2() failed: %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot find usable audio output device.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsupported sample format.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ao_open_live() failed: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No driver.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This driver is not a live output device.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A valid option key has an invalid value.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot open the device: %1, channels: %2, rate: %3, bits: %4.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unknown error.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avcodec_alloc_frame() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>QuickFilterLine</name>
     <message>
         <source>Dictionary search/filter (Ctrl+F)</source>
@@ -3477,6 +3695,21 @@ It is not needed to select this option if you don&apos;t use such programs.</sou
     <message>
         <source>Clear Search</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ResourceToSaveHandler</name>
+    <message>
+        <source>ERROR: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Resource saving error: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The referenced resource failed to download.</source>
+        <translation type="unfinished">Apakañanaka pantjiwa</translation>
     </message>
 </context>
 <context>
@@ -3682,7 +3915,7 @@ fondos de grupos apropriados para utilizarlos.</translation>
     </message>
     <message>
         <source>Alternatively, use %GD1251% for CP1251, %GDISO1% for ISO 8859-1.</source>
-        <translation>Alternativamente, use %GD1251% en lugar de CP1251, %GDISO1% en lugar de ISO 8859-1.</translation>
+        <translation type="obsolete">Alternativamente, use %GD1251% en lugar de CP1251, %GDISO1% en lugar de ISO 8859-1.</translation>
     </message>
     <message>
         <source>Forvo</source>
@@ -3715,7 +3948,7 @@ p, li { white-space: pre-wrap; }
 &lt;tr&gt;
 &lt;td style=&quot;border: none;&quot;&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Get your own key &lt;a href=&quot;http://api.forvo.com/key/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0057ae;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;, or leave blank to use the default one.&lt;/p&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+        <translation type="obsolete">&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:&apos;DejaVu Sans&apos;; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
@@ -3835,10 +4068,6 @@ Todavía no implementado en GoldenDict.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Any external programs. A string %GDWORD% will be replaced with the query word. The word will also be fed into standard input.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>The most regular system, having a one-to-one relation to the
 kana writing systems. Standardized as ISO 3602
 
@@ -3860,12 +4089,92 @@ Not implemented yet in GoldenDict.</source>
         <source>Belarusian transliteration</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Get your own key &lt;a href=&quot;http://api.forvo.com/key/&quot;&gt;here&lt;/a&gt;, or leave blank to use the default one.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alternatively, use %GD1251% for CP1251, %GDISO1%...%GDISO16% for ISO 8859-1...ISO 8859-16 respectively,
+%GDBIG5% for Big-5, %GDBIG5HKSCS% for Big5-HKSCS, %GDGBK% for GBK and GB18030, %GDSHIFTJIS% for Shift-JIS.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Text to Speech</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Any external programs. A string %GDWORD% will be replaced with the query word. If such string is not presented, the word will be fed into standard input.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>StylesComboBox</name>
     <message>
         <source>None</source>
         <translation type="unfinished">Ni maya</translation>
+    </message>
+</context>
+<context>
+    <name>TextToSpeechSource</name>
+    <message>
+        <source>Selected voice engines:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Remove</source>
+        <translation type="unfinished">&amp;Chhakjaña</translation>
+    </message>
+    <message>
+        <source>Preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Available voice engines:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Text to be previewed:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Type text to be previewed here.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No TTS voice available</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Confirm removal</source>
+        <translation type="unfinished">Chhaqtayapunitati</translation>
+    </message>
+    <message>
+        <source>Remove voice engine &lt;b&gt;%1&lt;/b&gt; from the list?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot find available TTS voice.&lt;br&gt;Please make sure that at least one TTS engine installed on your computer already.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Preferences</source>
+        <translation type="unfinished">Munata</translation>
+    </message>
+    <message>
+        <source>Volume:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rate:</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -3876,6 +4185,25 @@ Not implemented yet in GoldenDict.</source>
     </message>
     <message>
         <source>Drop-down</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>VoiceEnginesModel</name>
+    <message>
+        <source>Enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation type="unfinished">Suti</translation>
+    </message>
+    <message>
+        <source>Id</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Icon</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

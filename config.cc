@@ -48,10 +48,6 @@ namespace
     return result;
   }
 
-  QString getConfigFileName()
-  {
-    return getHomeDir().absoluteFilePath( "config" );
-  }
 }
 
 ProxyServer::ProxyServer(): enabled( false ), type( Socks5 ), port( 3128 )
@@ -114,23 +110,26 @@ Preferences::Preferences():
   scanToMainWindow( false ),
   pronounceOnLoadMain( false ),
   pronounceOnLoadPopup( false ),
-#ifdef Q_WS_WIN
+#ifndef DISABLE_INTERNAL_PLAYER
   useExternalPlayer( false ),
-  useWindowsPlaySound( true ),
+  useInternalPlayer( true ),
 #else
-  useExternalPlayer( true ), // Phonon on Linux still feels quite buggy
-  useWindowsPlaySound( false ),
+  useExternalPlayer( true ),
+  useInternalPlayer( false ),
 #endif
-  useBassLibrary( false ),
   checkForNewReleases( true ),
   disallowContentFromOtherSites( false ),
   enableWebPlugins( false ),
+  hideGoldenDictHeader( false ),
   zoomFactor( 1 ),
   wordsZoomLevel( 0 ),
   maxStringsInHistory( 500 ),
   storeHistory( 1 ),
   alwaysExpandOptionalParts( true )
 , historyStoreInterval( 0 )
+, collapseBigArticles( false )
+, articleSizeLimit( 2000 )
+, maxDictionaryRefsInContextMenu ( 20 )
 {
 }
 
@@ -179,6 +178,8 @@ MediaWikis makeDefaultMediaWikis( bool enable )
   mw.push_back( MediaWiki( "21c64bca5ec10ba17ff19f3066bc962a", "German Wiktionary", "http://de.wiktionary.org/w", false, "" ) );
   mw.push_back( MediaWiki( "96957cb2ad73a20c7a1d561fc83c253a", "Portuguese Wikipedia", "http://pt.wikipedia.org/w", false, "" ) );
   mw.push_back( MediaWiki( "ed4c3929196afdd93cc08b9a903aad6a", "Portuguese Wiktionary", "http://pt.wiktionary.org/w", false, "" ) );
+  mw.push_back( MediaWiki( "f3b4ec8531e52ddf5b10d21e4577a7a2", "Greek Wikipedia", "http://el.wikipedia.org/w", false, "" ) );
+  mw.push_back( MediaWiki( "5d45232075d06e002dea72fe3e137da1", "Greek Wiktionary", "http://el.wiktionary.org/w", false, "" ) );
 
   return mw;
 }
@@ -308,6 +309,12 @@ Class load() throw( exError )
 
     if ( QDir( "/usr/share/dictd" ).exists() )
       c.paths.push_back( Path( "/usr/share/dictd", true ) );
+
+    if ( QDir( "/usr/share/opendict/dictionaries" ).exists() )
+      c.paths.push_back( Path( "/usr/share/opendict/dictionaries", true ) );
+
+    if ( QDir( "/usr/share/goldendict-wordnet" ).exists() )
+      c.paths.push_back( Path( "/usr/share/goldendict-wordnet", true ) );
 
     if ( QDir( "/usr/share/WyabdcRealPeopleTTS" ).exists() )
       c.soundDirs.push_back( SoundDir( "/usr/share/WyabdcRealPeopleTTS", "WyabdcRealPeopleTTS" ) );
@@ -602,6 +609,31 @@ Class load() throw( exError )
     c.webSites = makeDefaultWebSites();
   }
 
+  QDomNode ves = root.namedItem( "voiceEngines" );
+
+  if ( !ves.isNull() )
+  {
+    QDomNodeList nl = ves.toElement().elementsByTagName( "voiceEngine" );
+
+    for ( unsigned x = 0; x < nl.length(); ++x )
+    {
+      QDomElement ve = nl.item( x ).toElement();
+      VoiceEngine v;
+
+      v.enabled = ve.attribute( "enabled" ) == "1";
+      v.id = ve.attribute( "id" );
+      v.name = ve.attribute( "name" );
+      v.iconFilename = ve.attribute( "icon" );
+      v.volume = ve.attribute( "volume", "50" ).toInt();
+      if( v.volume < 0 || v.volume > 100 )
+        v.volume = 50;
+      v.rate = ve.attribute( "rate", "50" ).toInt();
+      if( v.rate < 0 || v.rate > 100 )
+        v.rate = 50;
+      c.voiceEngines.push_back( v );
+    }
+  }
+
   c.mutedDictionaries = loadMutedDictionaries( root.namedItem( "mutedDictionaries" ) );
   c.popupMutedDictionaries = loadMutedDictionaries( root.namedItem( "popupMutedDictionaries" ) );
 
@@ -659,15 +691,17 @@ Class load() throw( exError )
 
     c.preferences.pronounceOnLoadMain = ( preferences.namedItem( "pronounceOnLoadMain" ).toElement().text() == "1" );
     c.preferences.pronounceOnLoadPopup = ( preferences.namedItem( "pronounceOnLoadPopup" ).toElement().text() == "1" );
-    
+
     if ( !preferences.namedItem( "useExternalPlayer" ).isNull() )
       c.preferences.useExternalPlayer = ( preferences.namedItem( "useExternalPlayer" ).toElement().text() == "1" );
 
-    if ( !preferences.namedItem( "useWindowsPlaySound" ).isNull() )
-      c.preferences.useWindowsPlaySound = ( preferences.namedItem( "useWindowsPlaySound" ).toElement().text() == "1" );
-
-    if ( !preferences.namedItem( "useBassLibrary" ).isNull() )
-      c.preferences.useBassLibrary = ( preferences.namedItem( "useBassLibrary" ).toElement().text() == "1" );
+#ifndef DISABLE_INTERNAL_PLAYER
+    if ( !preferences.namedItem( "useInternalPlayer" ).isNull() )
+      c.preferences.useInternalPlayer = ( preferences.namedItem( "useInternalPlayer" ).toElement().text() == "1" );
+#else
+    c.preferences.useInternalPlayer = false;
+    c.preferences.useExternalPlayer = true;
+#endif
 
     if ( !preferences.namedItem( "audioPlaybackProgram" ).isNull() )
       c.preferences.audioPlaybackProgram = preferences.namedItem( "audioPlaybackProgram" ).toElement().text();
@@ -695,6 +729,9 @@ Class load() throw( exError )
     if ( !preferences.namedItem( "enableWebPlugins" ).isNull() )
       c.preferences.enableWebPlugins = ( preferences.namedItem( "enableWebPlugins" ).toElement().text() == "1" );
 
+    if ( !preferences.namedItem( "hideGoldenDictHeader" ).isNull() )
+      c.preferences.hideGoldenDictHeader = ( preferences.namedItem( "hideGoldenDictHeader" ).toElement().text() == "1" );
+
     if ( !preferences.namedItem( "maxStringsInHistory" ).isNull() )
       c.preferences.maxStringsInHistory = preferences.namedItem( "maxStringsInHistory" ).toElement().text().toUInt() ;
 
@@ -709,6 +746,15 @@ Class load() throw( exError )
 
     if ( !preferences.namedItem( "historyStoreInterval" ).isNull() )
       c.preferences.historyStoreInterval = preferences.namedItem( "historyStoreInterval" ).toElement().text().toUInt() ;
+
+    if ( !preferences.namedItem( "collapseBigArticles" ).isNull() )
+      c.preferences.collapseBigArticles = ( preferences.namedItem( "collapseBigArticles" ).toElement().text() == "1" );
+
+    if ( !preferences.namedItem( "articleSizeLimit" ).isNull() )
+      c.preferences.articleSizeLimit = preferences.namedItem( "articleSizeLimit" ).toElement().text().toUInt() ;
+
+    if ( !preferences.namedItem( "maxDictionaryRefsInContextMenu" ).isNull() )
+      c.preferences.maxDictionaryRefsInContextMenu = preferences.namedItem( "maxDictionaryRefsInContextMenu" ).toElement().text().toUShort();
   }
 
   c.lastMainGroupId = root.namedItem( "lastMainGroupId" ).toElement().text().toUInt();
@@ -759,6 +805,11 @@ Class load() throw( exError )
   if ( !dictInfoGeometry.isNull() )
     c.dictInfoGeometry = QByteArray::fromBase64( dictInfoGeometry.toElement().text().toLatin1() );
 
+  QDomNode inspectorGeometry = root.namedItem( "inspectorGeometry" );
+
+  if ( !inspectorGeometry.isNull() )
+    c.inspectorGeometry = QByteArray::fromBase64( inspectorGeometry.toElement().text().toLatin1() );
+
   QDomNode timeForNewReleaseCheck = root.namedItem( "timeForNewReleaseCheck" );
 
   if ( !timeForNewReleaseCheck.isNull() )
@@ -771,14 +822,14 @@ Class load() throw( exError )
 
   c.usingSmallIconsInToolbars = ( root.namedItem( "usingSmallIconsInToolbars" ).toElement().text() == "1" );
 
-  if ( !root.namedItem( "maxDictionaryRefsInContextMenu" ).isNull() )
-    c.maxDictionaryRefsInContextMenu = root.namedItem( "maxDictionaryRefsInContextMenu" ).toElement().text().toUShort();
-
   if ( !root.namedItem( "historyExportPath" ).isNull() )
     c.historyExportPath = root.namedItem( "historyExportPath" ).toElement().text();
 
   if ( !root.namedItem( "resourceSavePath" ).isNull() )
     c.resourceSavePath = root.namedItem( "resourceSavePath" ).toElement().text();
+
+  if ( !root.namedItem( "articleSavePath" ).isNull() )
+    c.articleSavePath = root.namedItem( "articleSavePath" ).toElement().text();
 
   if ( !root.namedItem( "editDictionaryCommandLine" ).isNull() )
     c.editDictionaryCommandLine = root.namedItem( "editDictionaryCommandLine" ).toElement().text();
@@ -1159,6 +1210,40 @@ void save( Class const & c ) throw( exError )
     }
   }
 
+  {
+    QDomNode ves = dd.createElement( "voiceEngines" );
+    root.appendChild( ves );
+
+    for ( VoiceEngines::const_iterator i = c.voiceEngines.begin(); i != c.voiceEngines.end(); ++i )
+    {
+      QDomElement v = dd.createElement( "voiceEngine" );
+      ves.appendChild( v );
+
+      QDomAttr id = dd.createAttribute( "id" );
+      id.setValue( i->id );
+      v.setAttributeNode( id );
+
+      QDomAttr name = dd.createAttribute( "name" );
+      name.setValue( i->name );
+      v.setAttributeNode( name );
+
+      QDomAttr enabled = dd.createAttribute( "enabled" );
+      enabled.setValue( i->enabled ? "1" : "0" );
+      v.setAttributeNode( enabled );
+
+      QDomAttr icon = dd.createAttribute( "icon" );
+      icon.setValue( i->iconFilename );
+      v.setAttributeNode( icon );
+
+      QDomAttr volume = dd.createAttribute( "volume" );
+      volume.setValue( QString::number( i->volume ) );
+      v.setAttributeNode( volume );
+
+      QDomAttr rate = dd.createAttribute( "rate" );
+      rate.setValue( QString::number( i->rate ) );
+      v.setAttributeNode( rate );
+    }
+  }
 
   {
     QDomElement muted = dd.createElement( "mutedDictionaries" );
@@ -1308,12 +1393,8 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( c.preferences.useExternalPlayer ? "1" : "0" ) );
     preferences.appendChild( opt );
 
-    opt = dd.createElement( "useWindowsPlaySound" );
-    opt.appendChild( dd.createTextNode( c.preferences.useWindowsPlaySound ? "1" : "0" ) );
-    preferences.appendChild( opt );
-
-    opt = dd.createElement( "useBassLibrary" );
-    opt.appendChild( dd.createTextNode( c.preferences.useBassLibrary ? "1" : "0" ) );
+    opt = dd.createElement( "useInternalPlayer" );
+    opt.appendChild( dd.createTextNode( c.preferences.useInternalPlayer ? "1" : "0" ) );
     preferences.appendChild( opt );
 
     opt = dd.createElement( "audioPlaybackProgram" );
@@ -1373,6 +1454,10 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( c.preferences.enableWebPlugins ? "1" : "0" ) );
     preferences.appendChild( opt );
 
+    opt = dd.createElement( "hideGoldenDictHeader" );
+    opt.appendChild( dd.createTextNode( c.preferences.hideGoldenDictHeader ? "1" : "0" ) );
+    preferences.appendChild( opt );
+
     opt = dd.createElement( "maxStringsInHistory" );
     opt.appendChild( dd.createTextNode( QString::number( c.preferences.maxStringsInHistory ) ) );
     preferences.appendChild( opt );
@@ -1388,7 +1473,18 @@ void save( Class const & c ) throw( exError )
     opt = dd.createElement( "addonStyle" );
     opt.appendChild( dd.createTextNode( c.preferences.addonStyle ) );
     preferences.appendChild( opt );
-  }
+
+    opt = dd.createElement( "collapseBigArticles" );
+    opt.appendChild( dd.createTextNode( c.preferences.collapseBigArticles ? "1" : "0" ) );
+    preferences.appendChild( opt );
+
+    opt = dd.createElement( "articleSizeLimit" );
+    opt.appendChild( dd.createTextNode( QString::number( c.preferences.articleSizeLimit ) ) );
+    preferences.appendChild( opt );
+
+    opt = dd.createElement( "maxDictionaryRefsInContextMenu" );
+    opt.appendChild( dd.createTextNode( QString::number( c.preferences.maxDictionaryRefsInContextMenu ) ) );
+    preferences.appendChild( opt ); }
 
   {
     QDomElement opt = dd.createElement( "lastMainGroupId" );
@@ -1446,6 +1542,10 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( QString::fromLatin1( c.dictInfoGeometry.toBase64() ) ) );
     root.appendChild( opt );
 
+    opt = dd.createElement( "inspectorGeometry" );
+    opt.appendChild( dd.createTextNode( QString::fromLatin1( c.inspectorGeometry.toBase64() ) ) );
+    root.appendChild( opt );
+
     opt = dd.createElement( "timeForNewReleaseCheck" );
     opt.appendChild( dd.createTextNode( c.timeForNewReleaseCheck.toString( Qt::ISODate ) ) );
     root.appendChild( opt );
@@ -1462,10 +1562,6 @@ void save( Class const & c ) throw( exError )
     opt.appendChild( dd.createTextNode( c.usingSmallIconsInToolbars ? "1" : "0" ) );
     root.appendChild( opt );
 
-    opt = dd.createElement( "maxDictionaryRefsInContextMenu" );
-    opt.appendChild( dd.createTextNode( QString::number( c.maxDictionaryRefsInContextMenu ) ) );
-    root.appendChild( opt );
-
     if( !c.historyExportPath.isEmpty() )
     {
         opt = dd.createElement( "historyExportPath" );
@@ -1477,6 +1573,13 @@ void save( Class const & c ) throw( exError )
     {
         opt = dd.createElement( "resourceSavePath" );
         opt.appendChild( dd.createTextNode( c.resourceSavePath ) );
+        root.appendChild( opt );
+    }
+
+    if( !c.articleSavePath.isEmpty() )
+    {
+        opt = dd.createElement( "articleSavePath" );
+        opt.appendChild( dd.createTextNode( c.articleSavePath ) );
         root.appendChild( opt );
     }
 
@@ -1501,6 +1604,11 @@ void save( Class const & c ) throw( exError )
   configFile.close();
 
   renameAtomically( configFile.fileName(), getConfigFileName() );
+}
+
+QString getConfigFileName()
+{
+  return getHomeDir().absoluteFilePath( "config" );
 }
 
 QString getConfigDir() throw( exError )

@@ -25,12 +25,17 @@
 #include "indexedzip.hh"
 #include "filetype.hh"
 
+#ifdef _MSC_VER
+#include <stub_msvc.h>
+#endif
+
 #include <QIODevice>
 #include <QXmlStreamReader>
 #include <QTextDocument>
 #include <QFileInfo>
 #include <QDir>
 #include <QPainter>
+#include <QDebug>
 
 #include <QSemaphore>
 #include <QThreadPool>
@@ -94,7 +99,11 @@ struct IdxHeader
                                      // resource index.
   uint32_t zipIndexRootOffset;
   uint32_t revisionNumber; // Format revision 
-} __attribute__((packed));
+}
+#ifndef _MSC_VER
+__attribute__((packed))
+#endif
+;
 
 bool indexIsOldOrBad( string const & indexFile )
 {
@@ -524,7 +533,10 @@ void XdxfDictionary::loadArticle( uint32_t address,
   }
 
   if ( &chunk.front() + chunk.size() - propertiesData < 9 )
-    throw exCorruptedIndex();
+  {
+    articleText = string( "<div class=\"xdxf\">Index seems corrupted</div>" );
+    return;
+  }
 
   unsigned char fType = (unsigned char) *propertiesData;
 
@@ -545,7 +557,11 @@ void XdxfDictionary::loadArticle( uint32_t address,
   }
 
   if ( !articleBody )
-    throw exCantReadFile( getDictionaryFilenames()[ 0 ] );
+  {
+//    throw exCantReadFile( getDictionaryFilenames()[ 0 ] );
+      articleText = string( "<div class=\"xdxf\">DICTZIP error: " ) + dict_error_str( dz ) + "</div>";
+    return;
+  }
 
   articleText = Xdxf2Html::convert( string( articleBody ), Xdxf2Html::XDXF, idxHeader.hasAbrv ? &abrv : NULL, this,
                                     fType == Logical, idxHeader.revisionNumber );
@@ -674,16 +690,31 @@ QString readXhtmlData( QXmlStreamReader & stream )
   return result;
 }
 
+namespace {
+
+/// Deal with Qt 4.5 incompatibility
+QString readElementText( QXmlStreamReader & stream )
+{
+#if QT_VERSION >= 0x040600
+    return stream.readElementText( QXmlStreamReader::SkipChildElements );
+#else
+    return stream.readElementText();
+#endif
+}
+
+}
+
+
 void addAllKeyTags( QXmlStreamReader & stream, list< QString > & words )
 {
   // todo implement support for tag <srt>, that overrides the article sorting order 
   if ( stream.name() == "k" )
   {
-    words.push_back( stream.readElementText( QXmlStreamReader::SkipChildElements ) );
+    words.push_back( readElementText( stream ) );
     return;
   }
 
-  while( !stream.atEnd() ) 
+  while( !stream.atEnd() )
   {
     stream.readNext();
   
@@ -752,8 +783,8 @@ void indexArticle( GzippedFile & gzFile,
       if ( words.empty() )
       {
         // Nothing to index, this article didn't have any tags
-        DPRINTF( "Warning: no <k> tags found in an article at offset 0x%x, article skipped.\n",
-                (unsigned) articleOffset );
+        qWarning( "Warning: no <k> tags found in an article at offset 0x%x, article skipped.\n",
+                  (unsigned) articleOffset );
       }
       else
       {
@@ -1017,6 +1048,8 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
       {
         // Building the index
 
+        qDebug( "Xdxf: Building the index for dictionary: %s\n", i->c_str() );
+
         //initializing.indexingDictionary( nameFromFileName( dictFiles[ 0 ] ) );
 
         File::Class idx( indexFile, "wb" );
@@ -1152,12 +1185,12 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                           stream.readNext();
                           if ( stream.isStartElement() && stream.name() == "abbr_k" )
                           {
-                            s = stream.readElementText( QXmlStreamReader::SkipChildElements );
+                            s = readElementText( stream );
                             keys.push_back( gd::toWString( s ) );
                           }
                           else if ( stream.isStartElement() && stream.name() == "abbr_v" )
                           {
-                            s =  stream.readElementText( QXmlStreamReader::SkipChildElements );
+                            s =  readElementText( stream );
                               value = Utf8::encode( Folding::trimWhitespace( gd::toWString( s ) ) );
                               for( list< wstring >::iterator i = keys.begin(); i != keys.end(); ++i )
                               {
@@ -1176,12 +1209,12 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
                           stream.readNext();
                           if ( stream.isStartElement() && stream.name() == "k" )
                           {
-                            s = stream.readElementText( QXmlStreamReader::SkipChildElements );
+                            s = readElementText( stream );
                             keys.push_back( gd::toWString( s ) );
                           }
                           else if ( stream.isStartElement() && stream.name() == "v" )
                           {
-                            s =  stream.readElementText( QXmlStreamReader::SkipChildElements );
+                            s =  readElementText( stream );
                               value = Utf8::encode( Folding::trimWhitespace( gd::toWString( s ) ) );
                               for( list< wstring >::iterator i = keys.begin(); i != keys.end(); ++i )
                               {
@@ -1295,9 +1328,9 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
 
         if ( stream.hasError() )
         {
-          DPRINTF( "Warning: %s had a parse error %ls at line %lu, and therefore was indexed only up to the point of error.",
-                   dictFiles[ 0 ].c_str(), stream.errorString().toStdWString().c_str(),
-                   (unsigned long) stream.lineNumber() );
+          qWarning( "Warning: %s had a parse error %ls at line %lu, and therefore was indexed only up to the point of error.",
+                     dictFiles[ 0 ].c_str(), stream.errorString().toStdWString().c_str(),
+                     (unsigned long) stream.lineNumber() );
         }
       }
 
@@ -1307,8 +1340,8 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
     }
     catch( std::exception & e )
     {
-      FDPRINTF( stderr, "Xdxf dictionary reading failed: %s, error: %s\n",
-        i->c_str(), e.what() );
+      qWarning( "Xdxf dictionary reading failed: %s, error: %s\n",
+                i->c_str(), e.what() );
     }
   }
 

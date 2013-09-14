@@ -69,6 +69,9 @@ public:
                                           wstring const & )
     throw( std::exception );
 
+  virtual bool isLocalDictionary()
+  { return true; }
+
 protected:
 
   virtual void loadIcon() throw();
@@ -278,7 +281,7 @@ void HunspellArticleRequest::run()
   }
   catch( Iconv::Ex & e )
   {
-    DPRINTF( "Hunspell: charset convertion error, no processing's done: %s\n", e.what() );
+    qWarning( "Hunspell: charset convertion error, no processing's done: %s\n", e.what() );
   }
 
   if ( suggestions )
@@ -492,13 +495,7 @@ QVector< wstring > HunspellHeadwordsRequest::suggest( wstring & word )
 
           if ( Folding::applySimpleCaseOnly( alt ) != lowercasedWord ) // No point in providing same word
           {
-            DPRINTF( ">>>>>Alt: %ls\n",
-#ifdef Q_OS_WIN
-                     gd::toQString( alt ).toStdWString().c_str()
-#else
-                     alt.c_str()
-#endif
-                     );
+            qDebug() << ">>>>>Alt:" << gd::toQString( alt );
             result.append( alt );
           }
         }
@@ -507,7 +504,7 @@ QVector< wstring > HunspellHeadwordsRequest::suggest( wstring & word )
   }
   catch( Iconv::Ex & e )
   {
-    DPRINTF( "Hunspell: charset convertion error, no processing's done: %s\n", e.what() );
+    qWarning( "Hunspell: charset convertion error, no processing's done: %s\n", e.what() );
   }
 
   if ( suggestions )
@@ -629,7 +626,7 @@ void HunspellPrefixMatchRequest::run()
   }
   catch( Iconv::Ex & e )
   {
-    DPRINTF( "Hunspell: charset convertion error, no processing's done: %s\n", e.what() );
+    qWarning( "Hunspell: charset convertion error, no processing's done: %s\n", e.what() );
   }
 
   finish();

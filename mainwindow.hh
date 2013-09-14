@@ -9,6 +9,7 @@
 #include <QToolButton>
 #include <QSystemTrayIcon>
 #include <QNetworkAccessManager>
+#include <QProgressDialog>
 #include "ui_mainwindow.h"
 #include "folding.hh"
 #include "config.hh"
@@ -144,7 +145,7 @@ private:
 
   QTimer newReleaseCheckTimer; // Countdown to a check for the new program
                                // release, if enabled
-  sptr< QNetworkReply > latestReleaseReply;
+  QNetworkReply *latestReleaseReply;
 
   sptr< QPrinter > printer; // The printer we use for all printing operations
 
@@ -194,7 +195,11 @@ private:
 
   /// Brings the main window to front if it's not currently, or hides it
   /// otherwise. The hiding part is omitted if onlyShow is true.
+#ifdef Q_WS_X11
+  void toggleMainWindow( bool onlyShow = false, bool byIconClick = false );
+#else
   void toggleMainWindow( bool onlyShow = false );
+#endif
 
   /// Creates hotkeyWrapper and hooks the currently set keys for it
   void installHotKeys();
@@ -237,6 +242,10 @@ private slots:
   void foundDictsContextMenuRequested( const QPoint & pos );
 
   void showDictionaryInfo( QString const & id );
+
+  void openDictionaryFolder( QString const & id );
+
+  void editDictionary ( Dictionary::Class * dict );
 
 private slots:
 
@@ -313,6 +322,8 @@ private slots:
 
   void dictsListItemActivated( QListWidgetItem * );
   void dictsListSelectionChanged();
+
+  void jumpToDictionary( QListWidgetItem *, bool force = false );
 
   void showDictsPane( );
   void dictsPaneVisibilityChanged ( bool );
@@ -404,6 +415,31 @@ private slots:
   /// Return true while scanning GoldenDict window
   bool isGoldenDictWindow( HWND hwnd );
 #endif
+};
+
+class ArticleSaveProgressDialog : public QProgressDialog
+{
+Q_OBJECT
+
+public:
+  explicit ArticleSaveProgressDialog( QWidget * parent = 0,  Qt::WindowFlags f = 0 ):
+    QProgressDialog( parent, f )
+  {
+    setAutoReset( false );
+    setAutoClose( false );
+  }
+
+public slots:
+  void perform()
+  {
+    int progress = value() + 1;
+    if ( progress == maximum() )
+    {
+      emit close();
+      deleteLater();
+    }
+    setValue( progress );
+  }
 };
 
 #endif

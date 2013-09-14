@@ -5,6 +5,79 @@
 #include <QMouseEvent>
 #include <QWebFrame>
 #include <QApplication>
+#include "articleinspector.hh"
+
+ArticleWebView::ArticleWebView( QWidget *parent ):
+  QWebView( parent ),
+#if QT_VERSION >= 0x040600
+  inspector( NULL ),
+#endif
+  midButtonPressed( false ),
+  selectionBySingleClick( false ),
+  showInspectorDirectly( true )
+{
+}
+
+ArticleWebView::~ArticleWebView()
+{
+#if QT_VERSION >= 0x040600
+  if ( inspector )
+    inspector->deleteLater();
+#endif
+}
+
+void ArticleWebView::setUp( Config::Class * cfg )
+{
+  this->cfg = cfg;
+}
+
+void ArticleWebView::triggerPageAction( QWebPage::WebAction action, bool checked )
+{
+#if QT_VERSION >= 0x040600
+  if ( action == QWebPage::InspectElement )
+  {
+    // Get or create inspector instance for current view.
+    if ( !inspector )
+    {
+      inspector = new ArticleInspector( cfg );
+      inspector->setPage( page() );
+      connect( this, SIGNAL( destroyed() ), inspector, SLOT( beforeClosed() ) );
+    }
+
+    if ( showInspectorDirectly )
+    {
+      showInspectorDirectly = false;
+      // Bring up the inspector window and set focus
+      inspector->show();
+      inspector->activateWindow();
+      inspector->raise();
+      return;
+    }
+  }
+#endif
+
+  QWebView::triggerPageAction( action, checked );
+}
+
+bool ArticleWebView::event( QEvent * event )
+{
+  switch ( event->type() )
+  {
+  case QEvent::MouseButtonRelease:
+  case QEvent::MouseButtonDblClick:
+    showInspectorDirectly = true;
+    break;
+
+  case QEvent::ContextMenu:
+    showInspectorDirectly = false;
+    break;
+
+  default:
+    break;
+  }
+
+  return QWebView::event( event );
+}
 
 void ArticleWebView::mousePressEvent( QMouseEvent * event )
 {
@@ -34,9 +107,13 @@ void ArticleWebView::mouseReleaseEvent( QMouseEvent * event )
 void ArticleWebView::mouseDoubleClickEvent( QMouseEvent * event )
 {
   QWebView::mouseDoubleClickEvent( event );
-
+#if QT_VERSION >= 0x040600
   int scrollBarWidth = page()->mainFrame()->scrollBarGeometry( Qt::Vertical ).width();
   int scrollBarHeight = page()->mainFrame()->scrollBarGeometry( Qt::Horizontal ).height();
+#else
+  int scrollBarWidth = 0;
+  int scrollBarHeight = 0;
+#endif
 
   // emit the signal only if we are not double-clicking on scrollbars
   if ( ( event->x() < width() - scrollBarWidth ) &&

@@ -189,14 +189,14 @@ struct Preferences
   bool pronounceOnLoadMain, pronounceOnLoadPopup;
   QString audioPlaybackProgram;
   bool useExternalPlayer;
-  bool useWindowsPlaySound;
-  bool useBassLibrary;
+  bool useInternalPlayer;
 
   ProxyServer proxyServer;
 
   bool checkForNewReleases;
   bool disallowContentFromOtherSites;
   bool enableWebPlugins;
+  bool hideGoldenDictHeader;
 
   qreal zoomFactor;
   int wordsZoomLevel;
@@ -206,6 +206,11 @@ struct Preferences
   bool alwaysExpandOptionalParts;
 
   unsigned historyStoreInterval;
+
+  bool collapseBigArticles;
+  int articleSizeLimit;
+
+  unsigned short maxDictionaryRefsInContextMenu;
 
   QString addonStyle;
 
@@ -381,6 +386,43 @@ struct Program
 
 typedef QVector< Program > Programs;
 
+struct VoiceEngine
+{
+  bool enabled;
+  QString id;
+  QString name;
+  QString iconFilename;
+  int volume; // 0-100 allowed
+  int rate;   // 0-100 allowed
+
+  VoiceEngine(): enabled( false )
+    , volume( 50 )
+    , rate( 50 )
+  {}
+  VoiceEngine( QString id_, QString name_, int volume_, int rate_ ):
+    enabled( false )
+    , id( id_ )
+    , name( name_ )
+    , volume( volume_ )
+    , rate( rate_ )
+  {}
+
+  bool operator == ( VoiceEngine const & other ) const
+  {
+    return enabled == other.enabled &&
+           id == other.id &&
+           name == other.name &&
+           iconFilename == other.iconFilename &&
+           volume == other.volume &&
+           rate == other.rate;
+  }
+
+  bool operator != ( VoiceEngine const & other ) const
+    { return ! operator == ( other ); }
+};
+
+typedef QVector< VoiceEngine> VoiceEngines;
+
 struct Class
 {
   Paths paths;
@@ -395,6 +437,7 @@ struct Class
   Transliteration transliteration;
   Forvo forvo;
   Programs programs;
+  VoiceEngines voiceEngines;
 
   unsigned lastMainGroupId; // Last used group in main window
   unsigned lastPopupGroupId; // Last used group in popup window
@@ -402,9 +445,11 @@ struct Class
   QByteArray popupWindowState; // Binary state saved by QMainWindow
   QByteArray popupWindowGeometry; // Geometry saved by QMainWindow
   QByteArray dictInfoGeometry; // Geometry of "Dictionary info" window
+  QByteArray inspectorGeometry; // Geometry of WebKit inspector window
 
   QString historyExportPath; // Path for export/import history
-  QString resourceSavePath; // Path to save images/audio
+  QString resourceSavePath;  // Path to save images/audio
+  QString articleSavePath;   // Path to save articles
 
   bool pinPopupWindow; // Last pin status
 
@@ -422,8 +467,6 @@ struct Class
 
   bool usingSmallIconsInToolbars;
 
-  unsigned short maxDictionaryRefsInContextMenu;
-
   int maxPictureWidth; // Maximum picture width
 
   /// Maximum size for the headwords.
@@ -438,7 +481,7 @@ struct Class
 
   Class(): lastMainGroupId( 0 ), lastPopupGroupId( 0 ),
            pinPopupWindow( false ), showingDictBarNames( false ),
-           usingSmallIconsInToolbars( false ), maxDictionaryRefsInContextMenu( 20 ),
+           usingSmallIconsInToolbars( false ),
            maxPictureWidth( 0 ), maxHeadwordSize ( 256U )
   {}
   Group * getGroup( unsigned id );
@@ -485,6 +528,9 @@ Class load() throw( exError );
 
 /// Saves the configuration
 void save( Class const & ) throw( exError );
+
+/// Returns the configuration file name.
+QString getConfigFileName();
 
 /// Returns the main configuration directory.
 QString getConfigDir() throw( exError );

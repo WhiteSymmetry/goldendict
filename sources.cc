@@ -7,24 +7,26 @@
 #include <QStandardItemModel>
 #include "dprintf.hh"
 
-Sources::Sources( QWidget * parent, Config::Paths const & paths,
-                  Config::SoundDirs const & soundDirs,
-                  Config::Hunspell const & hunspell,
-                  Config::Transliteration const & trs,
-                  Config::Forvo const & forvo,
-                  Config::MediaWikis const & mediawikis,
-                  Config::WebSites const & webSites,
-                  Config::Programs const & programs ): QWidget( parent ),
+
+Sources::Sources( QWidget * parent, Config::Class const & cfg):
+  QWidget( parent ),
+#if defined( Q_OS_WIN32 ) || defined( Q_OS_MACX )
+  textToSpeechSource( NULL ),
+#endif
   itemDelegate( new QItemDelegate( this ) ),
   itemEditorFactory( new QItemEditorFactory() ),
-  mediawikisModel( this, mediawikis ),
-  webSitesModel( this, webSites ),
-  programsModel( this, programs ),
-  pathsModel( this, paths ),
-  soundDirsModel( this, soundDirs ),
-  hunspellDictsModel( this, hunspell )
+  mediawikisModel( this, cfg.mediawikis ),
+  webSitesModel( this, cfg.webSites ),
+  programsModel( this, cfg.programs ),
+  pathsModel( this, cfg.paths ),
+  soundDirsModel( this, cfg.soundDirs ),
+  hunspellDictsModel( this, cfg.hunspell )
 {
   ui.setupUi( this );
+
+  Config::Hunspell const & hunspell = cfg.hunspell;
+  Config::Transliteration const & trs = cfg.transliteration;
+  Config::Forvo const & forvo = cfg.forvo;
 
   // TODO: will programTypeEditorCreator and itemEditorFactory be destoryed by
   // anyone?
@@ -91,6 +93,12 @@ Sources::Sources( QWidget * parent, Config::Paths const & paths,
   ui.forvoEnabled->setChecked( forvo.enable );
   ui.forvoApiKey->setText( forvo.apiKey );
   ui.forvoLanguageCodes->setText( forvo.languageCodes );
+
+  // Text to speech
+#if defined( Q_OS_WIN32 ) || defined( Q_OS_MACX )
+  textToSpeechSource = new TextToSpeechSource( this, cfg.voiceEngines );
+  ui.tabWidget->addTab( textToSpeechSource, tr( "Text to Speech" ) );
+#endif
 
   if ( Config::isPortableVersion() )
   {
@@ -278,6 +286,17 @@ void Sources::on_removeProgram_clicked()
     programsModel.removeProgram( current.row() );
 }
 
+Config::VoiceEngines Sources::getVoiceEngines() const
+{
+#if defined( Q_OS_WIN32 ) || defined( Q_OS_MACX )
+  if ( !textToSpeechSource )
+    return Config::VoiceEngines();
+  return textToSpeechSource->getVoiceEnginesModel().getCurrentVoiceEngines();
+#else
+  return Config::VoiceEngines();
+#endif
+}
+
 Config::Hunspell Sources::getHunspell() const
 {
   Config::Hunspell h;
@@ -428,7 +447,7 @@ QVariant MediaWikisModel::data( QModelIndex const & index, int role ) const
   }
 
   if ( role == Qt::CheckStateRole && !index.column() )
-    return mediawikis[ index.row() ].enabled;
+    return mediawikis[ index.row() ].enabled ? Qt::Checked : Qt::Unchecked;
 
   return QVariant();
 }
@@ -585,7 +604,7 @@ QVariant WebSitesModel::data( QModelIndex const & index, int role ) const
   }
 
   if ( role == Qt::CheckStateRole && !index.column() )
-    return webSites[ index.row() ].enabled;
+    return webSites[ index.row() ].enabled ? Qt::Checked : Qt::Unchecked;
 
   return QVariant();
 }
@@ -749,7 +768,7 @@ QVariant ProgramsModel::data( QModelIndex const & index, int role ) const
   }
 
   if ( role == Qt::CheckStateRole && !index.column() )
-    return programs[ index.row() ].enabled;
+    return programs[ index.row() ].enabled ? Qt::Checked : Qt::Unchecked;
 
   return QVariant();
 }
@@ -910,7 +929,7 @@ QVariant PathsModel::data( QModelIndex const & index, int role ) const
     return paths[ index.row() ].path;
 
   if ( role == Qt::CheckStateRole && index.column() == 1 )
-    return paths[ index.row() ].recursive;
+    return paths[ index.row() ].recursive ? Qt::Checked : Qt::Unchecked;
 
   return QVariant();
 }
@@ -1132,10 +1151,10 @@ QVariant HunspellDictsModel::data( QModelIndex const & index, int role ) const
     for( unsigned x = enabledDictionaries.size(); x--; )
     {
       if ( enabledDictionaries[ x ] == dataFiles[ index.row() ].dictId )
-        return true;
+        return Qt::Checked;
     }
 
-    return false;
+    return Qt::Unchecked;
   }
 
   return QVariant();

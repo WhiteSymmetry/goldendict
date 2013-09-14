@@ -27,6 +27,10 @@
         <source>(c) 2008-2013 Konstantin Isakov (ikm@goldendict.org)</source>
         <translation>(c) 2008-2013 Konstantin Isakov (ikm@goldendict.org)</translation>
     </message>
+    <message>
+        <source>Based on Qt %1 (%2, %3 bit)</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ArticleMaker</name>
@@ -84,6 +88,14 @@ GPLv3 veya daha üst lisanslıdır.</translation>
         <source>(picture)</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Expand article</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Collapse article</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ArticleRequest</name>
@@ -106,6 +118,14 @@ GPLv3 veya daha üst lisanslıdır.</translation>
     <message>
         <source>Individual words: </source>
         <translation>Ayrı kelimeler:</translation>
+    </message>
+    <message>
+        <source>Expand article</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Collapse article</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -132,7 +152,7 @@ GPLv3 veya daha üst lisanslıdır.</translation>
     </message>
     <message>
         <source>Playing a non-WAV file</source>
-        <translation>Olmayan bir WAV dosyası oynatma</translation>
+        <translation type="obsolete">Olmayan bir WAV dosyası oynatma</translation>
     </message>
     <message>
         <source>Open Link in &amp;External Browser</source>
@@ -192,7 +212,7 @@ GPLv3 veya daha üst lisanslıdır.</translation>
     </message>
     <message>
         <source>To enable playback of files different than WAV, please go to Edit|Preferences, choose the Audio tab and select &quot;Play via DirectShow&quot; there.</source>
-        <translation>WAV dosyalarını oynatmayı etkinleştirmek için,Düzen|Tercihler&apos;e gidin
+        <translation type="obsolete">WAV dosyalarını oynatmayı etkinleştirmek için,Düzen|Tercihler&apos;e gidin
 Ses sekmesinden &quot;DirectShow ile çal&quot; seçeneğini seçin.</translation>
     </message>
     <message>
@@ -232,14 +252,6 @@ Ses sekmesinden &quot;DirectShow ile çal&quot; seçeneğini seçin.</translatio
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Bass library not found.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Bass library can&apos;t play this sound.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Definition from dictionary &quot;%1&quot;: %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -276,15 +288,35 @@ Ses sekmesinden &quot;DirectShow ile çal&quot; seçeneğini seçin.</translatio
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Resource saving error: </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Save &amp;image...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Save s&amp;ound...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TTS Voice</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WARNING: FFmpeg Audio Player: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy as text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Inspect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Video</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Video: %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -408,6 +440,19 @@ between classic and school orthography in cyrillic)</source>
         <source>Description:</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Open folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit dictionary</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit the dictionary via command:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>DictListModel</name>
@@ -436,6 +481,14 @@ between classic and school orthography in cyrillic)</source>
     </message>
     <message>
         <source>&amp;Dictionary Bar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open dictionary folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Extended menu with all dictionaries...</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1521,12 +1574,23 @@ between classic and school orthography in cyrillic)</source>
         <source>Tamazight</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Lojban</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>LoadDictionaries</name>
     <message>
         <source>Error loading dictionaries</source>
         <translation>Sözlük yükleme hatası</translation>
+    </message>
+</context>
+<context>
+    <name>Main</name>
+    <message>
+        <source>Error in configuration file. Continue with default settings?</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1753,7 +1817,7 @@ between classic and school orthography in cyrillic)</source>
     </message>
     <message>
         <source>Html files (*.html *.htm)</source>
-        <translation>Html Dosyaları (*.html *.htm)</translation>
+        <translation type="obsolete">Html Dosyaları (*.html *.htm)</translation>
     </message>
     <message>
         <source>Welcome!</source>
@@ -1978,6 +2042,37 @@ between classic and school orthography in cyrillic)</source>
     <message>
         <source>F3</source>
         <translation type="unfinished">F3</translation>
+    </message>
+    <message>
+        <source>Accessibility API is not enabled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Article, Complete (*.html)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Article, HTML Only (*.html)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saving article...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open dictionary folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>Mdx::MdxArticleRequest</name>
+    <message>
+        <source>Dictionary file was tampered or corrupted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed loading article from %1, reason: %2</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -2218,11 +2313,11 @@ proxy sunucusu kullanmak istiyorsanız etkinleştirin.</translation>
     </message>
     <message>
         <source>Play via Windows native API</source>
-        <translation>Windows yerel uygulamasıyla çal</translation>
+        <translation type="obsolete">Windows yerel uygulamasıyla çal</translation>
     </message>
     <message>
         <source>Play via DirectShow</source>
-        <translation>DirectShow ile oynat</translation>
+        <translation type="obsolete">DirectShow ile oynat</translation>
     </message>
     <message>
         <source>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
@@ -2367,7 +2462,7 @@ ve muhtemelen indirme sayfasını açar.</translation>
     <message>
         <source>Use Windows native playback API. Limited to .wav files only,
 but works very well.</source>
-        <translation>Windows yerel çalma programını kullanın.
+        <translation type="obsolete">Windows yerel çalma programını kullanın.
 Sınırlıdır, (sadece Wav dosyaları) ama çok iyi çalışmakta.</translation>
     </message>
     <message>
@@ -2412,7 +2507,7 @@ daha sonra da basılabilir.</translation>
     <message>
         <source>Play audio via Phonon framework. May be somewhat unstable,
 but should support most audio file formats.</source>
-        <translation>Ses dosyalarını Phonon Framework ile oynat. Bu pek çok ses 
+        <translation type="obsolete">Ses dosyalarını Phonon Framework ile oynat. Bu pek çok ses 
 formatlarını destekler, ancak kararsız olabilir.</translation>
     </message>
     <message>
@@ -2433,7 +2528,7 @@ formatlarını destekler, ancak kararsız olabilir.</translation>
     </message>
     <message>
         <source>Play via Phonon</source>
-        <translation>Phonon ile oynat</translation>
+        <translation type="obsolete">Phonon ile oynat</translation>
     </message>
     <message>
         <source>Right Alt</source>
@@ -2611,15 +2706,6 @@ Siz bu tür programları kullanmak istemiyorsanız bu seçeneği
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Play audio via Bass library. Optimal choice. To use this mode
-you must place bass.dll (http://www.un4seen.com) into GoldenDict folder.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Play via Bass library</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Add-on style:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2641,6 +2727,59 @@ you must place bass.dll (http://www.un4seen.com) into GoldenDict folder.</source
     </message>
     <message>
         <source>minutes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Modern</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lingoes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Lingoes-Blue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Play audio files via FFmpeg(libav) and libao</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use internal player</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Some sites detect GoldenDict via HTTP headers and block the requests.
+Enable this option to workaround the problem.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Do not identify GoldenDict in HTTP headers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select this option to automatic collapse big articles</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Collapse articles more than</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>symbols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust this value to avoid huge context menus.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Context menu dictionaries limit:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Articles longer than this size will be collapsed</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2706,6 +2845,85 @@ you must place bass.dll (http://www.un4seen.com) into GoldenDict folder.</source
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>Article loading error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Article decoding error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avformat_alloc_context() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>av_malloc() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avio_alloc_context() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avformat_open_input() failed: %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avformat_find_stream_info() failed: %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not find audio stream.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Codec [id: %1] not found.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avcodec_open2() failed: %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot find usable audio output device.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsupported sample format.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ao_open_live() failed: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No driver.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This driver is not a live output device.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A valid option key has an invalid value.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot open the device: %1, channels: %2, rate: %3, bits: %4.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unknown error.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>avcodec_alloc_frame() failed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>QuickFilterLine</name>
     <message>
         <source>Dictionary search/filter (Ctrl+F)</source>
@@ -2718,6 +2936,21 @@ you must place bass.dll (http://www.un4seen.com) into GoldenDict folder.</source
     <message>
         <source>Clear Search</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ResourceToSaveHandler</name>
+    <message>
+        <source>ERROR: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Resource saving error: </source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The referenced resource failed to download.</source>
+        <translation type="unfinished">İlgili kaynak indirilmesi başarısız oldu.</translation>
     </message>
 </context>
 <context>
@@ -2842,7 +3075,7 @@ Yeniden boyutlandırma, ya da başka bir şekilde yönetilebilir.</translation>
     </message>
     <message>
         <source>Alternatively, use %GD1251% for CP1251, %GDISO1% for ISO 8859-1.</source>
-        <translation>Alternatif olarak %GD1251% için CP1251, %GDISO1% için ISO 8859-1 kullanılabilir.</translation>
+        <translation type="obsolete">Alternatif olarak %GD1251% için CP1251, %GDISO1% için ISO 8859-1 kullanılabilir.</translation>
     </message>
     <message>
         <source>Greek transliteration</source>
@@ -2861,7 +3094,7 @@ p, li { white-space: pre-wrap; }
 &lt;tr&gt;
 &lt;td style=&quot;border: none;&quot;&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Get your own key &lt;a href=&quot;http://api.forvo.com/key/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0057ae;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;, or leave blank to use the default one.&lt;/p&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+        <translation type="obsolete">&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:&apos;DejaVu Sans&apos;; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
@@ -3065,7 +3298,7 @@ uygun grupların altlarına ekleyin.</translation>
     </message>
     <message>
         <source>Any external programs. A string %GDWORD% will be replaced with the query word. The word will also be fed into standard input.</source>
-        <translation>Her türlü harici programlar. Metin %GDWORD% arama kelimesi ile değiştirilecektir. Bu kelime de standart girişten girecektir.</translation>
+        <translation type="obsolete">Her türlü harici programlar. Metin %GDWORD% arama kelimesi ile değiştirilecektir. Bu kelime de standart girişten girecektir.</translation>
     </message>
     <message>
         <source>Remove program &lt;b&gt;%1&lt;/b&gt; from the list?</source>
@@ -3073,6 +3306,23 @@ uygun grupların altlarına ekleyin.</translation>
     </message>
     <message>
         <source>Belarusian transliteration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Get your own key &lt;a href=&quot;http://api.forvo.com/key/&quot;&gt;here&lt;/a&gt;, or leave blank to use the default one.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alternatively, use %GD1251% for CP1251, %GDISO1%...%GDISO16% for ISO 8859-1...ISO 8859-16 respectively,
+%GDBIG5% for Big-5, %GDBIG5HKSCS% for Big5-HKSCS, %GDGBK% for GBK and GB18030, %GDSHIFTJIS% for Shift-JIS.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Text to Speech</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Any external programs. A string %GDWORD% will be replaced with the query word. If such string is not presented, the word will be fed into standard input.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3084,6 +3334,69 @@ uygun grupların altlarına ekleyin.</translation>
     </message>
 </context>
 <context>
+    <name>TextToSpeechSource</name>
+    <message>
+        <source>Selected voice engines:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Remove</source>
+        <translation type="unfinished">&amp;Kaldır</translation>
+    </message>
+    <message>
+        <source>Preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Available voice engines:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Text to be previewed:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Type text to be previewed here.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No TTS voice available</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Confirm removal</source>
+        <translation type="unfinished">Kaldırmayı Onayla</translation>
+    </message>
+    <message>
+        <source>Remove voice engine &lt;b&gt;%1&lt;/b&gt; from the list?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot find available TTS voice.&lt;br&gt;Please make sure that at least one TTS engine installed on your computer already.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Preferences</source>
+        <translation type="unfinished">Tercihler</translation>
+    </message>
+    <message>
+        <source>Volume:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rate:</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>TranslateBox</name>
     <message>
         <source>Type a word or phrase to search dictionaries</source>
@@ -3091,6 +3404,25 @@ uygun grupların altlarına ekleyin.</translation>
     </message>
     <message>
         <source>Drop-down</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>VoiceEnginesModel</name>
+    <message>
+        <source>Enabled</source>
+        <translation type="unfinished">Etkin</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation type="unfinished">İsim</translation>
+    </message>
+    <message>
+        <source>Id</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Icon</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

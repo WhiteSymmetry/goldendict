@@ -2,16 +2,15 @@
  * Part of GoldenDict. Licensed under GPLv3 or later, see the LICENSE file */
 
 #include "dsl_details.hh"
+
 #include "folding.hh"
 #include "langcoder.hh"
-#include <wctype.h>
-#include <stdio.h>
 #include "dprintf.hh"
 #include "ufile.hh"
-
-#ifdef Q_OS_WIN
 #include "wstring_qt.hh"
-#endif
+
+#include <stdio.h>
+#include <wctype.h>
 
 namespace Dsl {
 namespace Details {
@@ -92,37 +91,61 @@ ArticleDom::ArticleDom( wstring const & str ):
 
         if( !linkTo.empty() )
         {
-          if ( !textNode )
+          list< wstring > allLinkEntries;
+          expandOptionalParts( linkTo, &allLinkEntries );
+
+          for( list< wstring >::iterator entry = allLinkEntries.begin();
+               entry != allLinkEntries.end(); )
           {
-            Node text = Node( Node::Text(), wstring() );
+            if ( !textNode )
+            {
+              Node text = Node( Node::Text(), wstring() );
+
+              if ( stack.empty() )
+              {
+                root.push_back( text );
+                stack.push_back( &root.back() );
+              }
+              else
+              {
+                stack.back()->push_back( text );
+                stack.push_back( &stack.back()->back() );
+              }
+
+              textNode = stack.back();
+            }
+            textNode->text.push_back( L'-' );
+            textNode->text.push_back( L' ' );
+
+            // Close the currently opened text node
+            stack.pop_back();
+            textNode = 0;
+
+            wstring linkText = Folding::trimWhitespace( *entry );
+            processUnsortedParts( linkText, false );
+            ArticleDom nodeDom( linkText );
+
+            Node link( Node::Tag(), GD_NATIVE_TO_WS( L"@" ), wstring() );
+            for( Node::iterator n = nodeDom.root.begin(); n != nodeDom.root.end(); ++n )
+              link.push_back( *n );
+
+            ++entry;
 
             if ( stack.empty() )
             {
-              root.push_back( text );
-              stack.push_back( &root.back() );
+              root.push_back( link );
+              if( entry != allLinkEntries.end() ) // Add line break before next entry
+                root.push_back( Node( Node::Tag(), GD_NATIVE_TO_WS( L"br" ), wstring() ) );
             }
             else
             {
-              stack.back()->push_back( text );
-              stack.push_back( &stack.back()->back() );
+              stack.back()->push_back( link );
+              if( entry != allLinkEntries.end() )
+                stack.back()->push_back( Node( Node::Tag(), GD_NATIVE_TO_WS( L"br" ), wstring() ) );
             }
-
-            textNode = stack.back();
           }
-          textNode->text.push_back( L'-' );
-          textNode->text.push_back( L' ' );
 
-          // Close the currently opened text node
-          stack.pop_back();
-          textNode = 0;
 
-          Node link( Node::Tag(), GD_NATIVE_TO_WS( L"@" ), wstring() );
-          link.push_back( Node( Node::Text(), linkTo ) );
-
-          if ( stack.empty() )
-            root.push_back( link );
-          else
-            stack.back()->push_back( link );
 
           // Skip to next '@'
 
@@ -200,9 +223,10 @@ ArticleDom::ArticleDom( wstring const & str ):
         
         if ( !isClosing )
         {
-          if ( name.size() == 2 && name[ 0 ] == L'm' && iswdigit( name[ 1 ] ) )
+          if ( name == GD_NATIVE_TO_WS( L"m" ) ||
+               ( name.size() == 2 && name[ 0 ] == L'm' && iswdigit( name[ 1 ] ) ) )
           {
-            // Opening an 'mX' tag closes any previous 'm' tag
+            // Opening an 'mX' or 'm' tag closes any previous 'm' tag
             closeTag( GD_NATIVE_TO_WS( L"m" ), stack, false );
           }
           
@@ -520,13 +544,8 @@ void ArticleDom::closeTag( wstring const & name,
   else
   if ( warn )
   {
-    FDPRINTF( stderr, "Warning: no corresponding opening tag for closing tag \"/%ls\" found.\n",
-#ifdef Q_OS_WIN
-              gd::toQString( name ).toStdWString().c_str()
-#else
-              name.c_str()
-#endif
-              );
+    qWarning() << "Warning: no corresponding opening tag for closing tag" <<
+                   gd::toQString( name ) << "found.";
   }
 }
 
@@ -567,7 +586,7 @@ void ArticleDom::nextChar() throw( eot )
 
 DslScanner::DslScanner( string const & fileName ) throw( Ex, Iconv::Ex ):
   encoding( Windows1252 ), iconv( encoding ), readBufferPtr( readBuffer ),
-  readBufferLeft( 0 ), linesRead( 0 )
+  readBufferLeft( 0 ), wcharBuffer( 64 ), linesRead( 0 )
 {
   // Since .dz is backwards-compatible with .gz, we use gz- functions to
   // read it -- they are much nicer than the dict_data- ones.
@@ -836,6 +855,34 @@ bool DslScanner::readNextLine( wstring & out, size_t & offset ) throw( Ex,
   }
 }
 
+bool DslScanner::readNextLineWithoutComments( wstring & out, size_t & offset )
+                 throw( Ex, Iconv::Ex )
+{
+  wstring str;
+  bool commentToNextLine = false;
+  size_t currentOffset;
+
+  out.erase();
+  offset = 0;
+
+  do
+  {
+    bool b = readNextLine( str, currentOffset );
+
+    if( offset == 0 )
+      offset = currentOffset;
+
+    if( !b )
+      return false;
+
+    stripComments( str, commentToNextLine);
+
+    out += str;
+  }
+  while( commentToNextLine );
+
+  return true;
+}
 
 /////////////// DslScanner
 
@@ -1041,6 +1088,35 @@ void expandOptionalParts( wstring & str, list< wstring > * result,
     headwords->push_back( str );
   if( !inside_recurse )
     result->merge( expanded );
+}
+
+static const wstring openBraces( GD_NATIVE_TO_WS( L"{{" ) );
+static const wstring closeBraces( GD_NATIVE_TO_WS( L"}}" ) );
+
+void stripComments( wstring & str, bool & nextLine )
+{
+  string::size_type n = 0, n2 = 0;
+
+  for( ; ; )
+  {
+    if( nextLine )
+    {
+      n = str.find( closeBraces, n2 );
+      if( n == string::npos )
+      {
+        str.erase( n2, n );
+        return;
+      }
+      str.erase( n2, n - n2 + 2 );
+      nextLine = false;
+    }
+
+    n = str.find( openBraces, n2 );
+    if( n == string::npos )
+      return;
+    nextLine = true;
+    n2 = n;
+  }
 }
 
 void expandTildes( wstring & str, wstring const & tildeReplacement )

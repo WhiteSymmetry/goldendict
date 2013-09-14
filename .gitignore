@@ -8,7 +8,9 @@ locale/*.qm
 debug/
 build/
 release/
+tmp/
 goldendict
+winlibs/lib32-48/
 
 Makefile
 Makefile.Debug
@@ -26,3 +28,13 @@ version.txt
 /goldendict.app/
 /GoldenDict.app/
 *.dmg
+
+.DS_Store
+Info.plist
+GoldenDict.xcodeproj/
+
+# visual studio files
+*.sdf
+*.opensdf
+*.suo
+*.vcxproj.user

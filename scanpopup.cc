@@ -3,7 +3,6 @@
 
 #include "scanpopup.hh"
 #include "folding.hh"
-#include "mouseover.hh"
 #include "wstring_qt.hh"
 #include <QUrl>
 #include <QCursor>
@@ -13,6 +12,13 @@
 #include <QMouseEvent>
 #include <QDesktopWidget>
 #include "dprintf.hh"
+
+#ifdef Q_OS_MACX
+#include "macmouseover.hh"
+#define MouseOver MacMouseOver
+#else
+#include "mouseover.hh"
+#endif
 
 using std::wstring;
 
@@ -43,7 +49,7 @@ ScanPopup::ScanPopup( QWidget * parent,
   switchExpandModeAction( this ),
   focusTranslateLineAction( this ),
   wordFinder( this ),
-  dictionaryBar( this, configEvents, cfg.editDictionaryCommandLine ),
+  dictionaryBar( this, configEvents, cfg.editDictionaryCommandLine, cfg.preferences.maxDictionaryRefsInContextMenu ),
   mouseEnteredOnce( false ),
   mouseIntercepted( false ),
   hideTimer( this )
@@ -127,6 +133,8 @@ ScanPopup::ScanPopup( QWidget * parent,
            &dictionaryBar, SIGNAL( closePopupMenu() ) );
   connect( &dictionaryBar, SIGNAL( showDictionaryInfo( QString const & ) ),
            this, SIGNAL( showDictionaryInfo( QString const & ) ) );
+  connect( &dictionaryBar, SIGNAL( openDictionaryFolder( QString const & ) ),
+           this, SIGNAL( openDictionaryFolder( QString const & ) ) );
 
   if ( cfg.popupWindowGeometry.size() )
     restoreGeometry( cfg.popupWindowGeometry );
@@ -202,8 +210,10 @@ ScanPopup::ScanPopup( QWidget * parent,
   connect( definition, SIGNAL( statusBarMessage( QString const &, int, QPixmap const & ) ),
            this, SLOT( showStatusBarMessage( QString const &, int, QPixmap const & ) ) );
 
+#ifdef Q_WS_X11
   connect( QApplication::clipboard(), SIGNAL( changed( QClipboard::Mode ) ),
            this, SLOT( clipboardChanged( QClipboard::Mode ) ) );
+#endif
 
   connect( &MouseOver::instance(), SIGNAL( hovered( QString const &, bool ) ),
            this, SLOT( mouseHovered( QString const &, bool ) ) );
@@ -240,6 +250,7 @@ ScanPopup::ScanPopup( QWidget * parent,
 
   ui.goBackButton->setEnabled( false );
   ui.goForwardButton->setEnabled( false );
+
 }
 
 ScanPopup::~ScanPopup()
@@ -959,6 +970,8 @@ void ScanPopup::updateDictionaryBar()
     Config::Group * grp = cfg.getGroup( currentId );
     dictionaryBar.setMutedDictionaries( grp ? &grp->popupMutedDictionaries : 0 );
   }
+
+  setDictionaryIconSize();
 }
 
 void ScanPopup::mutedDictionariesChanged()
@@ -999,4 +1012,12 @@ void ScanPopup::on_goBackButton_clicked()
 void ScanPopup::on_goForwardButton_clicked()
 {
   definition->forward();
+}
+
+void ScanPopup::setDictionaryIconSize()
+{
+  int extent = cfg.usingSmallIconsInToolbars ?
+               QApplication::style()->pixelMetric( QStyle::PM_SmallIconSize ) :
+               21;
+  dictionaryBar.setDictionaryIconSize( extent );
 }

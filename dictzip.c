@@ -173,7 +173,7 @@ static void err_fatal( const char *routine, const char *format, ... )
    
    fflush( stderr );
    fflush( stdout );
-   exit ( 1 );
+//   exit ( 1 );
 }
 
 /* \doc |err_fatal_errno| flushes "stdout", prints a fatal error report on
@@ -212,7 +212,7 @@ static void err_fatal_errno( const char *routine, const char *format, ... )
    
    fflush( stderr );
    fflush( stdout );
-   exit( 1 );
+//   exit( 1 );
 }
 
 /* \doc |err_internal| flushes "stdout", prints the fatal error message,
@@ -246,7 +246,7 @@ static void err_internal( const char *routine, const char *format, ... )
      fprintf( stderr, "Aborting...\n" );
   fflush( stderr );
   fflush( stdout );
-  abort();
+//  abort();
 }
 
 #ifndef __func__
@@ -273,8 +273,11 @@ static int dict_read_header( const char *filename,
    unsigned long offset;
 
    if (!(str = gd_fopen( filename, "rb" )))
+   {
       err_fatal_errno( __func__,
 		       "Cannot open data file \"%s\" for read\n", filename );
+      return 1;
+   }
 
    header->filename     = NULL;//str_find( filename );
    header->headerLength = GZ_XLEN - 1;
@@ -326,9 +329,13 @@ static int dict_read_header( const char *filename,
 	 header->version     |= getc( str ) << 8;
 	 
 	 if (header->version != 1)
+	 {
 	    err_internal( __func__,
 			  "dzip header version %d not supported\n",
 			  header->version );
+	    fclose( str );
+	    return 1;
+	 }
    
 	 header->chunkLength  = getc( str ) << 0;
 	 header->chunkLength |= getc( str ) << 8;
@@ -360,6 +367,8 @@ static int dict_read_header( const char *filename,
 	    err_fatal (
 	       __func__,
 	       "too long FNAME field in dzip file \"%s\"\n", filename);
+	    fclose( str );
+	    return 1;
 	 }
       }
 
@@ -379,6 +388,8 @@ static int dict_read_header( const char *filename,
 	    err_fatal (
 	       __func__,
 	       "too long COMMENT field in dzip file \"%s\"\n", filename);
+	    fclose( str );
+	    return 1;
 	 }
       }
 
@@ -396,9 +407,13 @@ static int dict_read_header( const char *filename,
    }
 
    if (ftell( str ) != header->headerLength + 1)
+   {
       err_internal( __func__,
 		    "File position (%lu) != header length + 1 (%d)\n",
 		    ftell( str ), header->headerLength + 1 );
+      fclose( str );
+      return 1;
+   }
 
    fseek( str, -8, SEEK_END );
    header->crc     = getc( str ) <<  0;
@@ -445,6 +460,9 @@ dictData *dict_data_open( const char *filename, int computeCRC )
 
    for(;;)
    {
+#ifdef __WIN32
+     wchar_t wname[16384];
+#endif
      if (dict_read_header( filename, h, computeCRC )) {
        break; /*
         err_fatal( __func__,
@@ -452,7 +470,6 @@ dictData *dict_data_open( const char *filename, int computeCRC )
      }
 
 #ifdef __WIN32
-     wchar_t wname[16384];
      if( MultiByteToWideChar( CP_UTF8, 0, filename, -1, wname, 16384 ) == 0 )
        break;
 
@@ -528,9 +545,8 @@ char *dict_data_read_ (
    dictData *h, unsigned long start, unsigned long size,
    const char *preFilter, const char *postFilter )
 {
-   (void) preFilter;
-   (void) postFilter;
-   char          *buffer, *pt;
+   char * buffer;
+   char * pt;
    unsigned long end;
    int           count;
    char          *inBuffer;
@@ -539,10 +555,17 @@ char *dict_data_read_ (
    int           firstOffset, lastOffset;
    int           i, j;
    int           found, target, lastStamp;
+   (void) preFilter;
+   (void) postFilter;
 
    end  = start + size;
 
    buffer = xmalloc( size + 1 );
+   if( !buffer )
+   {
+     strcpy( h->errorString, "Cannot allocate memory" );
+     return 0;
+   }
 
    if ( !size )
    {
@@ -557,11 +580,16 @@ char *dict_data_read_ (
    assert( h != NULL);
    switch (h->type) {
    case DICT_GZIP:
+/*
       err_fatal( __func__,
 		 "Cannot seek on pure gzip format files.\n"
 		 "Use plain text (for performance)"
 		 " or dzip format (for space savings).\n" );
       break;
+*/
+      strcpy( h->errorString, "Cannot seek on pure gzip format files" );
+      xfree( buffer );
+      return 0;
    case DICT_TEXT:
    {
 #ifdef __WIN32
@@ -575,6 +603,7 @@ char *dict_data_read_ (
           fread( buffer, size, 1, h->fd ) != 1 )
 #endif
      {
+       strcpy( h->errorString, "Cannot read file" );
        xfree( buffer );
        return 0;
      }
@@ -592,9 +621,16 @@ char *dict_data_read_ (
 	 h->zStream.next_out  = NULL;
 	 h->zStream.avail_out = 0;
 	 if (inflateInit2( &h->zStream, -15 ) != Z_OK)
+/*
 	    err_internal( __func__,
 			  "Cannot initialize inflation engine: %s\n",
 			  h->zStream.msg );
+*/
+	 {
+	   sprintf( h->errorString, "Cannot initialize inflation engine: %s", h->zStream.msg );
+	   xfree( buffer );
+	   return 0;
+	 }
 	 ++h->initialized;
       }
       firstChunk  = start / h->chunkLength;
@@ -637,20 +673,30 @@ char *dict_data_read_ (
 	    count = h->cache[target].count;
 	    inBuffer = h->cache[target].inBuffer;
 	 } else {
+#ifdef __WIN32
+        DWORD pos ;
+        DWORD readed;
+#endif
 	    h->cache[target].chunk = -1;
 	    if (!h->cache[target].inBuffer)
 	       h->cache[target].inBuffer = xmalloc( h->chunkLength );
 	    inBuffer = h->cache[target].inBuffer;
 
 	    if (h->chunks[i] >= OUT_BUFFER_SIZE ) {
+/*
 	       err_internal( __func__,
 			     "h->chunks[%d] = %d >= %ld (OUT_BUFFER_SIZE)\n",
 			     i, h->chunks[i], OUT_BUFFER_SIZE );
+*/
+              sprintf( h->errorString, "h->chunks[%d] = %d >= %ld (OUT_BUFFER_SIZE)\n",
+                       i, h->chunks[i], OUT_BUFFER_SIZE );
+              xfree( buffer );
+              return 0;
 	    }
 
 #ifdef __WIN32
-      DWORD pos = SetFilePointer( h->fd, h->offsets[ i ], 0, FILE_BEGIN );
-      DWORD readed = 0;
+      pos = SetFilePointer( h->fd, h->offsets[ i ], 0, FILE_BEGIN );
+      readed = 0;
       if( pos != INVALID_SET_FILE_POINTER || GetLastError() != NO_ERROR )
         ReadFile( h->fd, outBuffer, h->chunks[ i ], &readed, 0 );
       if( h->chunks[ i ] != readed )
@@ -670,11 +716,24 @@ char *dict_data_read_ (
 	    h->zStream.next_out  = (Bytef *)inBuffer;
 	    h->zStream.avail_out = h->chunkLength;
 	    if (inflate( &h->zStream,  Z_PARTIAL_FLUSH ) != Z_OK)
-	       err_fatal( __func__, "inflate: %s\n", h->zStream.msg );
+	    {
+//	       err_fatal( __func__, "inflate: %s\n", h->zStream.msg );
+	      sprintf( h->errorString, "inflate: %s\n", h->zStream.msg );
+	      xfree( buffer );
+	      return 0;
+	    }
 	    if (h->zStream.avail_in)
+/*
 	       err_internal( __func__,
 			     "inflate did not flush (%d pending, %d avail)\n",
 			     h->zStream.avail_in, h->zStream.avail_out );
+*/
+	    {
+	      sprintf( h->errorString, "inflate did not flush (%d pending, %d avail)\n",
+		       h->zStream.avail_in, h->zStream.avail_out );
+	      xfree( buffer );
+	      return 0;
+	    }
 	    
 	    count = h->chunkLength - h->zStream.avail_out;
       dict_data_filter( inBuffer, &count, h->chunkLength, postFilter );
@@ -689,9 +748,17 @@ char *dict_data_read_ (
 	       pt += lastOffset - firstOffset;
 	    } else {
 	       if (count != h->chunkLength )
+/*
 		  err_internal( __func__,
 				"Length = %d instead of %d\n",
 				count, h->chunkLength );
+*/
+	       {
+		 sprintf( h->errorString, "Length = %d instead of %d\n",
+			  count, h->chunkLength );
+		 xfree( buffer );
+		 return 0;
+	       }
 	       memcpy( pt, inBuffer + firstOffset,
 		       h->chunkLength - firstOffset );
 	       pt += h->chunkLength - firstOffset;
@@ -708,9 +775,16 @@ char *dict_data_read_ (
       *pt = '\0';
       break;
    case DICT_UNKNOWN:
-      err_fatal( __func__, "Cannot read unknown file type\n" );
-      break;
+//      err_fatal( __func__, "Cannot read unknown file type\n" );
+      strcpy( h->errorString, "Cannot read unknown file type" );
+      xfree( buffer );
+      return 0;
    }
    
    return buffer;
+}
+
+char *dict_error_str( dictData *data )
+{
+  return data->errorString;
 }

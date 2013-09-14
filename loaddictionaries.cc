@@ -19,12 +19,15 @@
 #include "website.hh"
 #include "forvo.hh"
 #include "programs.hh"
+#include "voiceengines.hh"
 #include "dprintf.hh"
 #include "fsencoding.hh"
 #include "xdxf.hh"
 #include "sdict.hh"
 #include "aard.hh"
 #include "zipsounds.hh"
+#include "mdx.hh"
+#include "zim.hh"
 
 #include <QMessageBox>
 #include <QDir>
@@ -47,7 +50,12 @@ LoadDictionaries::LoadDictionaries( Config::Class const & cfg ):
 
   nameFilters << "*.bgl" << "*.ifo" << "*.lsa" << "*.dat"
               << "*.dsl" << "*.dsl.dz"  << "*.index" << "*.xdxf"
-              << "*.xdxf.dz" << "*.dct" << "*.aar" << "*.zips";
+              << "*.xdxf.dz" << "*.dct" << "*.aar" << "*.zips"
+              << "*.mdx"
+#ifdef MAKE_ZIM_SUPPORT
+              << "*.zim" << "*.zimaa"
+#endif
+;
 }
 
 void LoadDictionaries::run()
@@ -104,7 +112,8 @@ void LoadDictionaries::handlePath( Config::Path const & path )
         handlePath( Config::Path( fullName, true ) );
     }
 
-    allFiles.push_back( FsEncoding::encode( QDir::toNativeSeparators( fullName ) ) );
+    if ( !i->isDir() )
+      allFiles.push_back( FsEncoding::encode( QDir::toNativeSeparators( fullName ) ) );
   }
 
   {
@@ -175,6 +184,22 @@ void LoadDictionaries::handlePath( Config::Path const & path )
     dictionaries.insert( dictionaries.end(), zipSoundsDictionaries.begin(),
                          zipSoundsDictionaries.end() );
   }
+  {
+    vector< sptr< Dictionary::Class > > mdxDictionaries =
+      Mdx::makeDictionaries( allFiles, FsEncoding::encode( Config::getIndexDir() ), *this );
+
+    dictionaries.insert( dictionaries.end(), mdxDictionaries.begin(),
+                         mdxDictionaries.end() );
+  }
+#ifdef MAKE_ZIM_SUPPORT
+  {
+    vector< sptr< Dictionary::Class > > zimDictionaries =
+      Zim::makeDictionaries( allFiles, FsEncoding::encode( Config::getIndexDir() ), *this );
+
+    dictionaries.insert( dictionaries.end(), zimDictionaries.begin(),
+                         zimDictionaries.end() );
+  }
+#endif
 }
 
 void LoadDictionaries::indexingDictionary( string const & dictionaryName ) throw()
@@ -281,6 +306,14 @@ void loadDictionaries( QWidget * parent, bool showInitially,
   {
     vector< sptr< Dictionary::Class > > dicts =
       Programs::makeDictionaries( cfg.programs );
+
+    dictionaries.insert( dictionaries.end(), dicts.begin(), dicts.end() );
+  }
+
+  //// Text to Speech
+  {
+    vector< sptr< Dictionary::Class > > dicts =
+      VoiceEngines::makeDictionaries( cfg.voiceEngines );
 
     dictionaries.insert( dictionaries.end(), dicts.begin(), dicts.end() );
   }

@@ -17,58 +17,38 @@
 #include "webmultimediadownload.hh"
 #include "programs.hh"
 #include "dprintf.hh"
+#include "ffmpegaudio.hh"
 #include <QDebug>
+#include <QCryptographicHash>
+
+#if QT_VERSION >= 0x040600
 #include <QWebElement>
+#endif
+
+#include <assert.h>
 
 #ifdef Q_OS_WIN32
 #include <windows.h>
-#include <mmsystem.h> // For PlaySound
-#include "bass.hh"
 
 #include <QPainter>
 #endif
 
 #include <QBuffer>
 
-// Phonon headers are a mess. How to include them properly? Send patches if you
-// know.
-#ifdef __WIN32
-#include <Phonon/AudioOutput>
-#include <Phonon/MediaObject>
-#else
-#include <phonon/audiooutput.h>
-#include <phonon/mediaobject.h>
+#if defined( Q_OS_WIN32 ) || defined( Q_OS_MACX )
+#include "speechclient.hh"
 #endif
 
 using std::map;
 using std::list;
 
-/// A phonon-based audio player, created on demand
-struct AudioPlayer
+
+static QVariant evaluateJavaScriptVariableSafe( QWebFrame * frame, const QString & variable )
 {
-  Phonon::AudioOutput output;
-  Phonon::MediaObject object;
-
-  static AudioPlayer & instance();
-
-private:
-
-  AudioPlayer();
-};
-
-AudioPlayer::AudioPlayer():
-    output( Phonon::AccessibilityCategory )
-{
-  Phonon::createPath( &object, &output );
+  return frame->evaluateJavaScript(
+        QString( "( typeof( %1 ) !== 'undefined' && %1 !== undefined ) ? %1 : null;" )
+        .arg( variable ) );
 }
-
-AudioPlayer & AudioPlayer::instance()
-{
-  static AudioPlayer a;
-
-  return a;
-}
-
 
 ArticleView::ArticleView( QWidget * parent, ArticleNetworkAccessManager & nm,
                           std::vector< sptr< Dictionary::Class > > const & allDictionaries_,
@@ -89,11 +69,15 @@ ArticleView::ArticleView( QWidget * parent, ArticleNetworkAccessManager & nm,
   goForwardAction( this ),
   openSearchAction( this ),
   selectCurrentArticleAction( this ),
+  copyAsTextAction( this ),
+  inspectAction( this ),
   searchIsOpened( false ),
   dictionaryBarToggled( dictionaryBarToggled_ ),
   groupComboBox( groupComboBox_ )
 {
   ui.setupUi( this );
+
+  ui.definition->setUp( const_cast< Config::Class * >( &cfg ) );
 
   goBackAction.setShortcut( QKeySequence( "Alt+Left" ) );
   ui.definition->addAction( &goBackAction );
@@ -165,6 +149,17 @@ ArticleView::ArticleView( QWidget * parent, ArticleNetworkAccessManager & nm,
   connect( &selectCurrentArticleAction, SIGNAL( triggered() ),
            this, SLOT( selectCurrentArticle() ) );
 
+  copyAsTextAction.setShortcut( QKeySequence( "Ctrl+Shift+C" ) );
+  copyAsTextAction.setText( tr( "Copy as text" ) );
+  ui.definition->addAction( &copyAsTextAction );
+  connect( &copyAsTextAction, SIGNAL( triggered() ),
+           this, SLOT( copyAsText() ) );
+
+  inspectAction.setShortcut( QKeySequence( Qt::Key_F12 ) );
+  inspectAction.setText( tr( "Inspect" ) );
+  ui.definition->addAction( &inspectAction );
+  connect( &inspectAction, SIGNAL( triggered() ), this, SLOT( inspect() ) );
+
   ui.definition->installEventFilter( this );
   ui.searchFrame->installEventFilter( this );
 
@@ -181,7 +176,6 @@ ArticleView::ArticleView( QWidget * parent, ArticleNetworkAccessManager & nm,
                           blankPage );
 
   expandOptionalParts = cfg.preferences.alwaysExpandOptionalParts;
-
 }
 
 // explicitly report the minimum size, to avoid
@@ -200,13 +194,9 @@ ArticleView::~ArticleView()
 {
   cleanupTemp();
 
-#ifdef Q_OS_WIN32
-  if ( winWavData.size() )
-  {
-    // If we were playing some sound some time ago, make sure it stopped
-    // playing before freeing the waveform memory.
-    PlaySoundA( 0, 0, 0 );
-  }
+#ifndef DISABLE_INTERNAL_PLAYER
+  if ( cfg.preferences.useInternalPlayer )
+    Ffmpeg::AudioPlayer::instance().stop();
 #endif
 }
 
@@ -214,6 +204,13 @@ void ArticleView::showDefinition( QString const & word, unsigned group,
                                   QString const & scrollTo,
                                   Contexts const & contexts )
 {
+
+#ifndef DISABLE_INTERNAL_PLAYER
+  // first, let's stop the player
+  if ( cfg.preferences.useInternalPlayer )
+    Ffmpeg::AudioPlayer::instance().stop();
+#endif
+
   QUrl req;
 
   req.setScheme( "gdlookup" );
@@ -354,6 +351,9 @@ void ArticleView::loadFinished( bool )
   ui.definition->unsetCursor();
   //QApplication::restoreOverrideCursor();
 
+  // Expand collapsed article if only one loaded
+  ui.definition->page()->mainFrame()->evaluateJavaScript( QString( "gdCheckArticlesNumber();" ) );
+
   // Jump to current article after page reloading
   if( !articleToJump.isEmpty() )
   {
@@ -401,9 +401,8 @@ unsigned ArticleView::getGroup( QUrl const & url )
 
 QStringList ArticleView::getArticlesList()
 {
-  return ui.definition->page()->mainFrame()->
-           evaluateJavaScript( "gdArticleContents;" ).toString().
-             trimmed().split( ' ', QString::SkipEmptyParts );
+  return evaluateJavaScriptVariableSafe( ui.definition->page()->mainFrame(), "gdArticleContents" )
+      .toString().trimmed().split( ' ', QString::SkipEmptyParts );
 }
 
 QString ArticleView::getActiveArticleId()
@@ -417,8 +416,7 @@ QString ArticleView::getActiveArticleId()
 
 QString ArticleView::getCurrentArticle()
 {
-  QVariant v = ui.definition->page()->mainFrame()->evaluateJavaScript(
-    QString( "gdCurrentArticle;" ) );
+  QVariant v = evaluateJavaScriptVariableSafe( ui.definition->page()->mainFrame(), "gdCurrentArticle" );
 
   if ( v.type() == QVariant::String )
     return v.toString();
@@ -426,12 +424,12 @@ QString ArticleView::getCurrentArticle()
     return QString();
 }
 
-void ArticleView::jumpToDictionary( QString const & id )
+void ArticleView::jumpToDictionary( QString const & id, bool force )
 {
   QString targetArticle = "gdfrom-" + id;
 
-  // jump only if neceessary
-  if ( targetArticle != getCurrentArticle() )
+  // jump only if neceessary, or when forced
+  if ( force || targetArticle != getCurrentArticle() )
   {
     setCurrentArticle( targetArticle, true );
   }
@@ -492,7 +490,7 @@ void ArticleView::tryMangleWebsiteClickedUrl( QUrl & url, Contexts & contexts )
 
     if ( isFramedArticle( ca ) )
     {
-      QVariant result = ui.definition->page()->currentFrame()->evaluateJavaScript( "gdLastUrlText;" );
+      QVariant result = evaluateJavaScriptVariableSafe( ui.definition->page()->currentFrame(), "gdLastUrlText" );
 
       if ( result.type() == QVariant::String )
       {
@@ -695,9 +693,31 @@ void ArticleView::linkHovered ( const QString & link, const QString & , const QS
     msg = tr( "Audio" );
   }
   else
+  if ( url.scheme() == "gdtts" )
+  {
+    msg = tr( "TTS Voice" );
+  }
+  else
   if ( url.scheme() == "gdpicture" )
   {
     msg = tr( "Picture" );
+  }
+  else
+  if ( url.scheme() == "gdvideo" )
+  {
+    if ( url.path().isEmpty() )
+    {
+      msg = tr( "Video" );
+    }
+    else
+    {
+      QString path = url.path();
+      if ( path.startsWith( '/' ) )
+      {
+        path = path.mid( 1 );
+      }
+      msg = tr( "Video: %1" ).arg( path );
+    }
   }
   else
   if (url.scheme() == "gdlookup" || url.scheme().compare( "bword" ) == 0)
@@ -796,7 +816,7 @@ void ArticleView::openLink( QUrl const & url, QUrl const & ref,
     }
   }
   else
-  if ( url.scheme() == "bres" || url.scheme() == "gdau" ||
+  if ( url.scheme() == "bres" || url.scheme() == "gdau" || url.scheme() == "gdvideo" ||
        Dictionary::WebMultimediaDownload::isAudioUrl( url ) )
   {
     // Download it
@@ -948,6 +968,32 @@ void ArticleView::openLink( QUrl const & url, QUrl const & ref,
                            tr( "The referenced audio program doesn't exist." ) );
   }
   else
+  if ( url.scheme() == "gdtts" )
+  {
+// TODO: Port TTS
+#if defined( Q_OS_WIN32 ) || defined( Q_OS_MACX )
+    // Text to speech
+    QString md5Id = url.queryItemValue( "engine" );
+    QString text( url.path().mid( 1 ) );
+
+    for ( Config::VoiceEngines::const_iterator i = cfg.voiceEngines.begin();
+          i != cfg.voiceEngines.end(); ++i )
+    {
+      QString itemMd5Id = QString( QCryptographicHash::hash(
+                                     i->id.toUtf8(),
+                                     QCryptographicHash::Md5 ).toHex() );
+
+      if ( itemMd5Id == md5Id )
+      {
+        SpeechClient * speechClient = new SpeechClient( *i, this );
+        connect( speechClient, SIGNAL( finished() ), speechClient, SLOT( deleteLater() ) );
+        speechClient->tell( text );
+        break;
+      }
+    }
+#endif
+  }
+  else
   if ( isExternalLink( url ) )
   {
     // Use the system handler for the conventional external links
@@ -955,10 +1001,14 @@ void ArticleView::openLink( QUrl const & url, QUrl const & ref,
   }
 }
 
-void ArticleView::saveResource( const QUrl & url, QUrl const & ref )
+vector< ResourceToSaveHandler * > ArticleView::saveResource( const QUrl & url, const QString & fileName )
 {
-  resourceToSaveDownloadRequests.clear();
-  resourceToSaveUrl = url;
+  return saveResource( url, ui.definition->url(), fileName );
+}
+
+vector< ResourceToSaveHandler * > ArticleView::saveResource( const QUrl & url, const QUrl & ref, const QString & fileName )
+{
+  vector< ResourceToSaveHandler * > handlers;
   sptr< Dictionary::DataRequest > req;
 
   if( url.scheme() == "bres" || url.scheme() == "gico" || url.scheme() == "gdau")
@@ -992,25 +1042,8 @@ void ArticleView::saveResource( const QUrl & url, QUrl const & ref )
           req = (*activeDicts)[ x ]->getResource(
                   url.path().mid( 1 ).toUtf8().data() );
 
-          if ( req->isFinished() && req->dataSize() >= 0 )
-          {
-            // A request was instantly finished with success.
-            // If we've managed to spawn some lingering requests already,
-            // erase them.
-            resourceToSaveDownloadRequests.clear();
-
-            // Handle the result
-            resourceToSaveDownloadRequests.push_back( req );
-            resourceToSaveDownloadFinished();
-            return;
-          }
-          else
-          if ( !req->isFinished() )
-          {
-            resourceToSaveDownloadRequests.push_back( req );
-            connect( req.get(), SIGNAL( finished() ),
-                     this, SLOT( resourceToSaveDownloadFinished() ) );
-          }
+          ResourceToSaveHandler * handler = new ResourceToSaveHandler( this, req, fileName );
+          handlers.push_back( handler );
         }
       }
     }
@@ -1019,155 +1052,27 @@ void ArticleView::saveResource( const QUrl & url, QUrl const & ref )
       // Normal resource download
       QString contentType;
       req = articleNetMgr.getResource( url, contentType );
+
+      ResourceToSaveHandler * handler = new ResourceToSaveHandler( this, req, fileName );
+      handlers.push_back( handler );
     }
   }
   else
+  {
     req = new Dictionary::WebMultimediaDownload( url, articleNetMgr );
 
-  if( url.host().compare( "search" ) != 0 )
-  {
-    if ( !req.get() )
-    {
-      // Request failed, fail
-    }
-    else
-    if ( req->isFinished() && req->dataSize() >= 0 )
-    {
-      // Have data ready, handle it
-      resourceToSaveDownloadRequests.push_back( req );
-      resourceToSaveDownloadFinished();
-      return;
-    }
-    else
-    if ( !req->isFinished() )
-    {
-      // Queue to be handled when done
-
-      resourceToSaveDownloadRequests.push_back( req );
-      connect( req.get(), SIGNAL( finished() ),
-               this, SLOT( resourceToSaveDownloadFinished() ) );
-    }
+    ResourceToSaveHandler * handler = new ResourceToSaveHandler( this, req, fileName );
+    handlers.push_back( handler );
   }
 
-  if ( resourceToSaveDownloadRequests.empty() ) // No requests were queued
+  if ( handlers.empty() ) // No requests were queued
   {
     emit statusBarMessage(
           tr( "ERROR: %1" ).arg( tr( "The referenced resource doesn't exist." ) ),
           10000, QPixmap( ":/icons/error.png" ) );
-    return;
-  }
-  else
-    resourceToSaveDownloadFinished(); // Check any requests finished already
-}
-
-void ArticleView::resourceToSaveDownloadFinished()
-{
-  if ( resourceToSaveDownloadRequests.empty() )
-    return; // Stray signal
-
-  QByteArray resourceData;
-
-  // Find any finished resources
-
-  for( list< sptr< Dictionary::DataRequest > >::iterator i =
-       resourceToSaveDownloadRequests.begin(); i != resourceToSaveDownloadRequests.end(); )
-  {
-    if ( (*i)->isFinished() )
-    {
-      if ( (*i)->dataSize() >= 0 )
-      {
-        // Ok, got one finished, all others are irrelevant now
-
-        vector< char > const & data = (*i)->getFullData();
-        resourceData = QByteArray::fromRawData( data.data(), data.size() );
-        break;
-      }
-      else
-      {
-        // This one had no data. Erase it.
-        resourceToSaveDownloadRequests.erase( i++ );
-      }
-    }
-    else // Unfinished, try the next one.
-      i++;
   }
 
-  if( !resourceData.isEmpty() )
-  {
-    QString fileName;
-    QString savePath;
-    if( cfg.resourceSavePath.isEmpty() )
-      savePath = QDir::homePath();
-    else
-    {
-      savePath = QDir::fromNativeSeparators( cfg.resourceSavePath );
-      if( !QDir( savePath ).exists() )
-        savePath = QDir::homePath();
-    }
-
-    QString name = resourceToSaveUrl.path().section( '/', -1 );
-
-    if ( resourceToSaveUrl.scheme() == "gdau" ||
-         Dictionary::WebMultimediaDownload::isAudioUrl( resourceToSaveUrl ) )
-    {
-      // Audio data
-      if( name.indexOf( '.' ) < 0 )
-        name += ".wav";
-
-      fileName = savePath + "/" + name;
-      fileName = QFileDialog::getSaveFileName( parentWidget(), tr( "Save sound" ),
-                                               fileName,
-                                               tr( "Sound files (*.wav *.ogg *.mp3 *.mp4 *.aac *.flac *.mid *.wv *.ape);;All files (*.*)" ) );
-    }
-    else
-    {
-      // Image data
-
-      // Check for babylon image name
-      if( name[ 0 ] == '\x1E' )
-        name.remove( 0, 1 );
-      if( name[ name.length() - 1 ] == '\x1F' )
-        name.chop( 1 );
-
-      fileName = savePath + "/" + name;
-      fileName = QFileDialog::getSaveFileName( parentWidget(), tr( "Save image" ),
-                                               fileName,
-                                               tr( "Image files (*.bmp *.jpg *.png *.tif);;All files (*.*)" ) );
-    }
-
-    // Write data to file
-
-    if( !fileName.isEmpty() )
-    {
-      QFileInfo fileInfo( fileName );
-      emit storeResourceSavePath( QDir::toNativeSeparators( fileInfo.absoluteDir().absolutePath() ) );
-      QFile file( fileName );
-      if ( file.open( QFile::WriteOnly ) )
-      {
-        file.write( resourceData.data(), resourceData.size() );
-        file.close();
-      }
-      if( file.error() )
-      {
-        emit statusBarMessage(
-              tr( "ERROR: %1" ).arg( tr( "Resource saving error: " ) + file.errorString() ),
-              10000, QPixmap( ":/icons/error.png" ) );
-      }
-    }
-
-    // Ok, whatever it was, it's finished. Remove this and any other
-    // requests and finish.
-
-    resourceToSaveDownloadRequests.clear();
-    return;
-  }
-
-  if ( resourceToSaveDownloadRequests.empty() )
-  {
-    emit statusBarMessage(
-          tr( "ERROR: %1" ).arg( tr( "The referenced resource failed to download." ) ),
-          10000, QPixmap( ":/icons/error.png" ) );
-  }
+  return handlers;
 }
 
 void ArticleView::updateMutedContents()
@@ -1238,16 +1143,30 @@ void ArticleView::forward()
 
 bool ArticleView::hasSound()
 {
-  QVariant v = ui.definition->page()->mainFrame()->evaluateJavaScript( "gdAudioLink;" );
+  QVariant v = ui.definition->page()->mainFrame()->evaluateJavaScript( "gdAudioLinks.first" );
   if ( v.type() == QVariant::String )
-    soundScript = v.toString();
-  else
-    soundScript.clear();
-  return !soundScript.isEmpty();
+    return !v.toString().isEmpty();
+  return false;
 }
 
 void ArticleView::playSound()
 {
+  QVariant v;
+  QString soundScript;
+
+  v = ui.definition->page()->mainFrame()->evaluateJavaScript( "gdAudioLinks[gdAudioLinks.current]" );
+
+  if ( v.type() == QVariant::String )
+    soundScript = v.toString();
+
+  // fallback to the first one
+  if ( soundScript.isEmpty() )
+  {
+    v = ui.definition->page()->mainFrame()->evaluateJavaScript( "gdAudioLinks.first" );
+    if ( v.type() == QVariant::String )
+      soundScript = v.toString();
+  }
+
   if ( !soundScript.isEmpty() )
     openLink( QUrl::fromEncoded( soundScript.toUtf8() ), ui.definition->url() );
 }
@@ -1320,6 +1239,7 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
     }
   }
 
+#if QT_VERSION >= 0x040600
   QWebElement el = r.element();
   QUrl imageUrl;
   if( !popupView && el.tagName().compare( "img", Qt::CaseInsensitive ) == 0 )
@@ -1327,6 +1247,7 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
     imageUrl = QUrl::fromPercentEncoding( el.attribute( "src" ).toLatin1() );
     if( !imageUrl.isEmpty() )
     {
+      menu.addAction( ui.definition->pageAction( QWebPage::CopyImageToClipboard ) );
       saveImageAction = new QAction( tr( "Save &image..." ), &menu );
       menu.addAction( saveImageAction );
     }
@@ -1338,6 +1259,7 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
     saveSoundAction = new QAction( tr( "Save s&ound..." ), &menu );
     menu.addAction( saveSoundAction );
   }
+#endif
 
   QString selectedText = ui.definition->selectedText();
 
@@ -1346,8 +1268,15 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
     // We don't prompt for selections larger or equal to 60 chars, since
     // it ruins the menu and it's hardly a single word anyway.
 
+    QString text = ui.definition->selectedText();
+    if( text.isRightToLeft() )
+    {
+      text.insert( 0, (ushort)0x202E ); // RLE, Right-to-Left Embedding
+      text.append( (ushort)0x202C ); // PDF, POP DIRECTIONAL FORMATTING
+    }
+
     lookupSelection = new QAction( tr( "&Look up \"%1\"" ).
-                                   arg( ui.definition->selectedText() ),
+                                   arg( text ),
                                    &menu );
     menu.addAction( lookupSelection );
 
@@ -1355,18 +1284,18 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
     {
       lookupSelectionNewTab = new QAction( QIcon( ":/icons/addtab.png" ),
                                            tr( "Look up \"%1\" in &New Tab" ).
-                                           arg( ui.definition->selectedText() ),
+                                           arg( text ),
                                            &menu );
       menu.addAction( lookupSelectionNewTab );
 
       sendWordToInputLineAction = new QAction( tr( "Send \"%1\" to input line" ).
-                                               arg( ui.definition->selectedText() ),
+                                               arg( text ),
                                                &menu );
       menu.addAction( sendWordToInputLineAction );
     }
 
     addWordToHistoryAction = new QAction( tr( "&Add \"%1\" to history" ).
-                                          arg( ui.definition->selectedText() ),
+                                          arg( text ),
                                           &menu );
     menu.addAction( addWordToHistoryAction );
 
@@ -1406,6 +1335,7 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
   if ( selectedText.size() )
   {
     menu.addAction( ui.definition->pageAction( QWebPage::Copy ) );
+    menu.addAction( &copyAsTextAction );
   }
   else
   {
@@ -1434,7 +1364,7 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
       if ( allDictionaries[ x ]->getId() == i->toUtf8().data() )
       {
         QAction * action = 0;
-        if ( refsAdded == cfg.maxDictionaryRefsInContextMenu )
+        if ( refsAdded == cfg.preferences.maxDictionaryRefsInContextMenu )
         {
           // Enough! Or the menu would become too large.
           maxDictionaryRefsAction = new QAction( ".........", &menu );
@@ -1462,6 +1392,9 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
     if( maxDictionaryRefsReached )
       break;
   }
+
+  menu.addSeparator();
+  menu.addAction( &inspectAction );
 
   if ( !menu.isEmpty() )
   {
@@ -1502,11 +1435,59 @@ void ArticleView::contextMenuRequested( QPoint const & pos )
       emit showDefinitionInNewTab( selectedText, groupComboBox->getCurrentGroup(),
                                    QString(), Contexts() );
     else
-    if( result == saveImageAction )
-      saveResource( imageUrl, ui.definition->url() );
-    else
-    if( result == saveSoundAction )
-      saveResource( targetUrl, ui.definition->url() );
+    if( result == saveImageAction || result == saveSoundAction )
+    {
+#if QT_VERSION >= 0x040600
+      QUrl url = ( result == saveImageAction ) ? imageUrl : targetUrl;
+      QString savePath;
+      QString fileName;
+
+      if ( cfg.resourceSavePath.isEmpty() )
+        savePath = QDir::homePath();
+      else
+      {
+        savePath = QDir::fromNativeSeparators( cfg.resourceSavePath );
+        if ( !QDir( savePath ).exists() )
+          savePath = QDir::homePath();
+      }
+
+      QString name = url.path().section( '/', -1 );
+
+      if ( result == saveSoundAction )
+      {
+        // Audio data
+        if ( name.indexOf( '.' ) < 0 )
+          name += ".wav";
+
+        fileName = savePath + "/" + name;
+        fileName = QFileDialog::getSaveFileName( parentWidget(), tr( "Save sound" ),
+                                                 fileName,
+                                                 tr( "Sound files (*.wav *.ogg *.mp3 *.mp4 *.aac *.flac *.mid *.wv *.ape);;All files (*.*)" ) );
+      }
+      else
+      {
+        // Image data
+
+        // Check for babylon image name
+        if ( name[ 0 ] == '\x1E' )
+          name.remove( 0, 1 );
+        if ( name.length() && name[ name.length() - 1 ] == '\x1F' )
+          name.chop( 1 );
+
+        fileName = savePath + "/" + name;
+        fileName = QFileDialog::getSaveFileName( parentWidget(), tr( "Save image" ),
+                                                 fileName,
+                                                 tr( "Image files (*.bmp *.jpg *.png *.tif);;All files (*.*)" ) );
+      }
+
+      if ( !fileName.isEmpty() )
+      {
+        QFileInfo fileInfo( fileName );
+        emit storeResourceSavePath( QDir::toNativeSeparators( fileInfo.absoluteDir().absolutePath() ) );
+        saveResource( url, ui.definition->url(), fileName );
+      }
+#endif
+    }
     else
     {
       if ( !popupView && result == maxDictionaryRefsAction )
@@ -1548,68 +1529,16 @@ void ArticleView::resourceDownloadFinished()
              Dictionary::WebMultimediaDownload::isAudioUrl( resourceDownloadUrl ) )
         {
           // Audio data
-
-#ifdef Q_OS_WIN32
-          // If we use Windows PlaySound, use that, not Phonon.
-          if ( !cfg.preferences.useExternalPlayer &&
-               cfg.preferences.useWindowsPlaySound )
+#ifndef DISABLE_INTERNAL_PLAYER
+          if ( cfg.preferences.useInternalPlayer )
           {
-            // Stop any currently playing sound to make sure the previous data
-            // isn't used anymore
-            if ( winWavData.size() )
-            {
-              PlaySoundA( 0, 0, 0 );
-              winWavData.clear();
-            }
-
-            if ( data.size() < 4 || memcmp( data.data(), "RIFF", 4 ) != 0 )
-            {
-              QMessageBox::information( this, tr( "Playing a non-WAV file" ),
-                tr( "To enable playback of files different than WAV, please go "
-                    "to Edit|Preferences, choose the Audio tab and select "
-                    "\"Play via DirectShow\" there." ) );
-            }
-            else
-            {
-              winWavData = data;
-              PlaySoundA( &winWavData.front(), 0,
-                          SND_ASYNC | SND_MEMORY | SND_NODEFAULT | SND_NOWAIT );
-            }
-          }
-          else if ( !cfg.preferences.useExternalPlayer &&
-                     cfg.preferences.useBassLibrary )
-          {
-            if( !BassAudioPlayer::instance().canBeUsed() )
-              emit statusBarMessage( tr( "WARNING: %1" ).arg( tr( "Bass library not found." ) ),
-                                     10000, QPixmap( ":/icons/error.png" ) );
-            else
-            {
-              if( !BassAudioPlayer::instance().playMemory( data.data(), data.size() ) )
-                emit statusBarMessage( tr( "WARNING: %1" ).arg( tr( "Bass library can't play this sound." ) ),
-                                       10000, QPixmap( ":/icons/error.png" ) );
-            }
+            Ffmpeg::AudioPlayer & player = Ffmpeg::AudioPlayer::instance();
+            connect( &player, SIGNAL( error( QString ) ), this, SLOT( audioPlayerError( QString ) ), Qt::UniqueConnection );
+            player.playMemory( data.data(), data.size() );
           }
           else
 #endif
-          if ( !cfg.preferences.useExternalPlayer )
           {
-            // Play via Phonon
-
-            QBuffer * buf = new QBuffer;
-
-            buf->buffer().append( &data.front(), data.size() );
-
-            Phonon::MediaSource source( buf );
-            source.setAutoDelete( true ); // Dispose of our buf when done
-
-            AudioPlayer::instance().object.stop();
-            AudioPlayer::instance().object.clear();
-            AudioPlayer::instance().object.enqueue( source );
-            AudioPlayer::instance().object.play();
-          }
-          else
-          {
-
             // Use external viewer to play the file
             try
             {
@@ -1677,6 +1606,12 @@ void ArticleView::resourceDownloadFinished()
   }
 }
 
+void ArticleView::audioPlayerError( QString const & message )
+{
+  emit statusBarMessage( tr( "WARNING: FFmpeg Audio Player: %1" ).arg( message ),
+                         10000, QPixmap( ":/icons/error.png" ) );
+}
+
 void ArticleView::pasteTriggered()
 {
   QString text =
@@ -1686,7 +1621,16 @@ void ArticleView::pasteTriggered()
                   QApplication::clipboard()->text() ) ) );
 
   if ( text.size() )
-    showDefinition( text, getGroup( ui.definition->url() ), getCurrentArticle() );
+  {
+    unsigned groupId = getGroup( ui.definition->url() );
+    if ( groupId == 0 )
+    {
+      // We couldn't figure out the group out of the URL,
+      // so let's try the currently selected group.
+      groupId = groupComboBox->getCurrentGroup();
+    }
+    showDefinition( text, groupId, getCurrentArticle() );
+  }
 }
 
 void ArticleView::moveOneArticleUp()
@@ -1849,8 +1793,9 @@ void ArticleView::performFindOperation( bool restart, bool backwards, bool check
 
     if ( ui.searchCaseSensitive->isChecked() )
       f |= QWebPage::FindCaseSensitively;
-
+#if QT_VERSION >= 0x040600
     f |= QWebPage::HighlightAllOccurrences;
+#endif
 
     ui.definition->findText( "", f );
 
@@ -1944,6 +1889,18 @@ void ArticleView::switchExpandOptionalParts()
 
   emit setExpandMode( expandOptionalParts );
   reload();
+}
+
+void ArticleView::copyAsText()
+{
+  QString text = ui.definition->selectedText();
+  if( !text.isEmpty() )
+    QApplication::clipboard()->setText( text );
+}
+
+void ArticleView::inspect()
+{
+  ui.definition->triggerPageAction( QWebPage::InspectElement );
 }
 
 #ifdef Q_OS_WIN32
@@ -2191,3 +2148,68 @@ QString ArticleView::wordAtPoint( int x, int y )
 }
 
 #endif
+
+ResourceToSaveHandler::ResourceToSaveHandler(
+    ArticleView * view, sptr< Dictionary::DataRequest > req,
+    QString const & fileName ) :
+  QObject( view ),
+  req( req ),
+  fileName( fileName )
+{
+  connect( this, SIGNAL( statusBarMessage( QString, int, QPixmap ) ),
+           view, SIGNAL( statusBarMessage( QString, int, QPixmap ) ) );
+
+  // If DataRequest finsihed immediately, call our handler directly
+  if ( req.get()->isFinished() )
+  {
+    QMetaObject::invokeMethod( this, "downloadFinished", Qt::QueuedConnection );
+  }
+  else
+  {
+    connect( req.get(), SIGNAL( finished() ), this, SLOT( downloadFinished() ) );
+  }
+}
+
+void ResourceToSaveHandler::downloadFinished()
+{
+  assert( req && req.get()->isFinished() );
+
+  QByteArray resourceData;
+
+  if ( req.get()->dataSize() >= 0 )
+  {
+    vector< char > const & data = req.get()->getFullData();
+    resourceData = QByteArray( data.data(), data.size() );
+  }
+
+  // Write data to file
+
+  if ( !resourceData.isEmpty() && !fileName.isEmpty() )
+  {
+    QFileInfo fileInfo( fileName );
+    QDir().mkpath( fileInfo.absoluteDir().absolutePath() );
+
+    QFile file( fileName );
+    if ( file.open( QFile::WriteOnly ) )
+    {
+      file.write( resourceData.data(), resourceData.size() );
+      file.close();
+    }
+
+    if ( file.error() )
+    {
+      emit statusBarMessage(
+            tr( "ERROR: %1" ).arg( tr( "Resource saving error: " ) + file.errorString() ),
+            10000, QPixmap( ":/icons/error.png" ) );
+    }
+  }
+  else
+  {
+    emit statusBarMessage(
+          tr( "ERROR: %1" ).arg( tr( "The referenced resource failed to download." ) ),
+          10000, QPixmap( ":/icons/error.png" ) );
+  }
+
+  emit done();
+  deleteLater();
+}

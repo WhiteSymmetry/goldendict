@@ -10,6 +10,7 @@
 #include "dprintf.hh"
 #include "fsencoding.hh"
 #include "decompress.hh"
+#include "htmlescape.hh"
 
 #include <map>
 #include <set>
@@ -23,7 +24,8 @@
 #include <QSemaphore>
 #include <QThreadPool>
 #include <QAtomicInt>
-#include <QDomDocument>
+#include <QRegExp>
+#include <QDebug>
 
 #include "ufile.hh"
 
@@ -47,9 +49,7 @@ DEF_EX_STR( exCantReadFile, "Can't read file", Dictionary::Ex )
 DEF_EX_STR( exWordIsTooLarge, "Enountered a word that is too large:", Dictionary::Ex )
 DEF_EX_STR( exSuddenEndOfFile, "Sudden end of file", Dictionary::Ex )
 
-#ifdef _MSC_VER
 #pragma pack( push, 1 )
-#endif
 
 /// DCT file header
 struct DCT_header
@@ -107,9 +107,7 @@ __attribute__((packed))
 #endif
 ;
 
-#ifdef _MSC_VER
-#pragma pack( pop, 1 )
-#endif
+#pragma pack( pop )
 
 bool indexIsOldOrBad( string const & indexFile )
 {
@@ -256,60 +254,72 @@ string SdictDictionary::convert( string const & in )
       }
     }
 
-    QDomDocument dd;
-    QString errorStr;
-    int errorLine, errorColumn;
+    QString result = QString::fromUtf8( inConverted.c_str(), inConverted.size() );
 
-    if( !dd.setContent( QByteArray( inConverted.c_str() ), false, &errorStr, &errorLine, &errorColumn ) )
+    result.replace( QRegExp( "<\\s*(p|br)\\s*>", Qt::CaseInsensitive ), "<br/>" );
+    result.remove( QRegExp( "<\\s*/p\\s*>", Qt::CaseInsensitive ) );
+
+    result.replace( QRegExp( "<\\s*t\\s*>", Qt::CaseInsensitive ), "<span class=\"sdict_tr\" dir=\"ltr\">" );
+    result.replace( QRegExp( "<\\s*f\\s*>", Qt::CaseInsensitive ), "<span class=\"sdict_forms\">" );
+    result.replace( QRegExp( "<\\s*/(t|f)\\s*>", Qt::CaseInsensitive ), "</span>" );
+
+    result.replace( QRegExp( "<\\s*l\\s*>", Qt::CaseInsensitive ), "<ul>" );
+    result.replace( QRegExp( "<\\s*/l\\s*>", Qt::CaseInsensitive ), "</ul>" );
+
+    // Links handling
+
+    int n = 0;
+    for( ; ; )
     {
-        FDPRINTF( stderr, "Sdictionary article parse failed: %s at %d,%d\n", errorStr.toLocal8Bit().constData(),  errorLine,  errorColumn );
-        FDPRINTF( stderr, "The input was: %s\n", in.c_str() );
-        return in;
+      static QRegExp start_link_tag( "<\\s*r\\s*>", Qt::CaseInsensitive );
+      static QRegExp end_link_tag( "<\\s*/r\\s*>", Qt::CaseInsensitive );
+
+      n = result.indexOf( start_link_tag, n );
+      if( n < 0 )
+        break;
+
+      int end = result.indexOf( end_link_tag, n );
+      if( end < 0 )
+        break;
+
+      int tag_len = start_link_tag.cap().length();
+      QString link_text = result.mid( n + tag_len, end - n - tag_len );
+
+      result.replace( end, end_link_tag.cap().length(), "</a>" );
+      result.replace( n, tag_len, QString( "<a class=\"sdict_wordref\" href=\"bword:" ) + link_text + "\">");
     }
 
-    QDomNodeList nodes = dd.elementsByTagName( "r" ); // Reference to another word
+    // Adjust text direction for lines
 
-    while( nodes.size() )
+    n = 0;
+    bool b = true;
+    while( b )
     {
-      QDomElement el = nodes.at( 0 ).toElement();
+      int next = result.indexOf( "<br/>", n );
+      if( next < 0 )
+      {
+        next = result.length();
+        b = false;
+      }
 
-      el.setTagName( "a" );
-      el.setAttribute( "href", QString( "bword:" ) + el.text() );
-      el.setAttribute( "class", "sdict_wordref" );
+      if( !result.mid( n, next - n ).contains( '<' ) )
+      {
+        if( Html::unescape( result.mid( n, next - n ) ).isRightToLeft() != isToLanguageRTL() )
+        {
+          result.insert( next, "</span>" );
+          result.insert( n,
+                         QString( "<span dir = \"" )
+                         + ( isToLanguageRTL() ? "ltr" : "rtl" )
+                         + "\">"
+                        );
+          next = result.indexOf( "<br/>", n );
+        }
+      }
+
+      n = next + 5;
     }
 
-    nodes = dd.elementsByTagName( "t" ); // Transcription
-
-    while( nodes.size() )
-    {
-      QDomElement el = nodes.at( 0 ).toElement();
-
-      el.setTagName( "span" );
-      el.setAttribute( "class", "sdict_tr" );
-    }
-
-    nodes = dd.elementsByTagName( "l" ); // List
-
-    while( nodes.size() )
-    {
-      QDomElement el = nodes.at( 0 ).toElement();
-
-      el.setTagName( "ul" );
-    }
-
-    nodes = dd.elementsByTagName( "f" ); // Word forms
-
-    while( nodes.size() )
-    {
-      QDomElement el = nodes.at( 0 ).toElement();
-
-      el.setTagName( "span" );
-      el.setAttribute( "class", "sdict_forms" );
-    }
-
-//    DPRINTF( "Result>>>>>>>>>>: %s\n\n\n", dd.toByteArray().data() );
-
-    return dd.toByteArray().data();
+    return result.toUtf8().data();
 }
 
 void SdictDictionary::loadArticle( uint32_t address,
@@ -335,8 +345,15 @@ void SdictDictionary::loadArticle( uint32_t address,
     else
         articleText = string( articleBody.data(), articleSize );
 
-    articleText = "<div class=\"sdict\">" + articleText + "</div>";
     articleText = convert( articleText );
+
+    string div = "<div class=\"sdict\"";
+    if( isToLanguageRTL() )
+      div += " dir=\"rtl\"";
+    div += ">";
+
+    articleText.insert( 0, div );
+    articleText.append( "</div>" );
 }
 
 /// SdictDictionary::getArticle()
@@ -481,7 +498,7 @@ void SdictArticleRequest::run()
 
   for( i = mainArticles.begin(); i != mainArticles.end(); ++i )
   {
-      result += "<h3>";
+      result += dict.isFromLanguageRTL() ? "<h3 dir=\"rtl\">" : "<h3>";
       result += i->second.first;
       result += "</h3>";
       result += i->second.second;
@@ -489,10 +506,14 @@ void SdictArticleRequest::run()
 
   for( i = alternateArticles.begin(); i != alternateArticles.end(); ++i )
   {
-      result += "<h3>";
+      result += dict.isFromLanguageRTL() ? "<h3 dir=\"rtl\">" : "<h3>";
       result += i->second.first;
       result += "</h3>";
+      if( dict.isToLanguageRTL() )
+        result += "<span dir=\"rtl\">";
       result += i->second.second;
+      if( dict.isToLanguageRTL() )
+        result += "</span>";
   }
 
   Mutex::Lock _( dataMutex );
@@ -546,6 +567,8 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
       {
         try
         {
+          qDebug( "SDict: Building the index for dictionary: %s\n", i->c_str() );
+
           File::Class df( *i, "rb" );
 
           DCT_header dictHeader;
@@ -553,7 +576,7 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
           df.read( &dictHeader, sizeof(dictHeader) );
           if( strncmp( dictHeader.signature, "sdct", 4 ) )
           {
-              DPRINTF( "File %s is not valid sdictionary file", i->c_str() );
+              qWarning( "File \"%s\" is not valid SDictionary file", i->c_str() );
               continue;
           }
           int compression = dictHeader.compression & 0x0F;
@@ -650,13 +673,13 @@ vector< sptr< Dictionary::Class > > makeDictionaries(
         }
         catch( std::exception & e )
         {
-          FDPRINTF( stderr, "Sdictionary dictionary indexing failed: %s, error: %s\n",
-            i->c_str(), e.what() );
+          qWarning( "Sdictionary dictionary indexing failed: %s, error: %s\n",
+                    i->c_str(), e.what() );
           continue;
         }
         catch( ... )
         {
-          FDPRINTF( stderr, "Sdictionary dictionary indexing failed\n" );
+          qWarning( "Sdictionary dictionary indexing failed\n" );
           continue;
         }
       } // if need to rebuild

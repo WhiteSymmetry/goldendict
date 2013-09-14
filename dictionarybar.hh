@@ -19,7 +19,7 @@ public:
 
   /// Constructs an empty dictionary bar
   DictionaryBar( QWidget * parent,
-                 Config::Events &, QString const & _editDictionaryCommand );
+                 Config::Events &, QString const & _editDictionaryCommand, unsigned short const & maxDictionaryRefsInContextMenu_ );
 
   /// Sets dictionaries to be displayed in the bar. Their statuses (enabled/
   /// disabled) are taken from the configuration data.
@@ -39,6 +39,9 @@ signals:
   /// Signal for show dictionary info command from context menu
   void showDictionaryInfo( QString const & id );
 
+  /// Signal for open dictionary folder from context menu
+  void openDictionaryFolder( QString const & id );
+
   /// Signal to close context menu
   void closePopupMenu();
 
@@ -48,9 +51,12 @@ private:
   Config::Events & configEvents;
   Config::MutedDictionaries storedMutedSet;
   QString editDictionaryCommand;
+  // how many dictionaries should be shown in the context menu:
+  unsigned short const & maxDictionaryRefsInContextMenu;
   std::vector< sptr< Dictionary::Class > > allDictionaries;
   /// All the actions we have added to the toolbar
   QList< QAction * > dictActions;
+  QAction * maxDictionaryRefsAction;
 
   bool use14x21;
   int timerId;
@@ -68,6 +74,8 @@ private slots:
   void actionWasTriggered( QAction * );
 
   void dictsPaneClicked( QString const & );
+
+  void showContextMenu( QContextMenuEvent * event, bool extended = false );
 };
 
 #endif
