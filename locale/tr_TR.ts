@@ -29,7 +29,7 @@
     </message>
     <message>
         <source>Based on Qt %1 (%2, %3 bit)</source>
-        <translation type="unfinished"></translation>
+        <translation>Qt %1 (%2, %3 bit) temelli</translation>
     </message>
 </context>
 <context>
@@ -86,15 +86,15 @@ GPLv3 veya daha üst lisanslıdır.</translation>
     </message>
     <message>
         <source>(picture)</source>
-        <translation type="unfinished"></translation>
+        <translation>(resim)</translation>
     </message>
     <message>
         <source>Expand article</source>
-        <translation type="unfinished"></translation>
+        <translation>Makaleyi genişlet</translation>
     </message>
     <message>
         <source>Collapse article</source>
-        <translation type="unfinished"></translation>
+        <translation>Makaleyi daralt</translation>
     </message>
 </context>
 <context>
@@ -121,11 +121,11 @@ GPLv3 veya daha üst lisanslıdır.</translation>
     </message>
     <message>
         <source>Expand article</source>
-        <translation type="unfinished"></translation>
+        <translation>Makaleyi genişlet</translation>
     </message>
     <message>
         <source>Collapse article</source>
-        <translation type="unfinished"></translation>
+        <translation>Makaleyi daralt</translation>
     </message>
 </context>
 <context>
@@ -249,11 +249,11 @@ Ses sekmesinden &quot;DirectShow ile çal&quot; seçeneğini seçin.</translatio
     </message>
     <message>
         <source>&amp;Add &quot;%1&quot; to history</source>
-        <translation type="unfinished"></translation>
+        <translation>Geçmişe &amp;ekle &quot;%1&quot;</translation>
     </message>
     <message>
         <source>Definition from dictionary &quot;%1&quot;: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Sözlükten tanımlama &quot;%1&quot;: %2</translation>
     </message>
     <message>
         <source>Send &quot;%1&quot; to input line</source>
@@ -261,7 +261,7 @@ Ses sekmesinden &quot;DirectShow ile çal&quot; seçeneğini seçin.</translatio
     </message>
     <message>
         <source>Picture</source>
-        <translation type="unfinished"></translation>
+        <translation>Resim</translation>
     </message>
     <message>
         <source>Select Current Article</source>
